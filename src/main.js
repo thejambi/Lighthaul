@@ -329,7 +329,16 @@ function setPhase(p) {
 
 function fmtY(y) { return y >= 1000 ? (y / 1000).toFixed(2) + " kyr" : y.toFixed(1) + " yr"; }
 
+// two-tap confirm for accepting a contract (undocking commits you to the run)
+let armedOffer = null, armedTimer = null;
+function disarmOffer() {
+  if (armedOffer) { armedOffer.textContent = "ACCEPT & UNDOCK"; armedOffer.classList.remove("armed"); }
+  armedOffer = null;
+  clearTimeout(armedTimer);
+}
+
 function buildStation() {
+  disarmOffer();
   const s = stations[game.station];
   el("st-name").textContent = "Docked · " + s.name;
   el("st-stats").innerHTML =
@@ -353,7 +362,19 @@ function buildStation() {
       `<div class="sub">to <b>${stations[c.to].name}</b> · ${c.d.toFixed(0)} ly · ` +
       `deadline ${fmtY(c.deadline)} (universe) · ${need}</div>` +
       `<button class="btn" data-i="${i}">ACCEPT & UNDOCK</button>`;
-    div.querySelector("button").addEventListener("click", () => depart(game.offers[i]));
+    const btn = div.querySelector("button");
+    btn.addEventListener("click", () => {
+      if (armedOffer !== btn) {          // first tap arms this offer (disarms any other)
+        disarmOffer();
+        armedOffer = btn;
+        btn.textContent = "CONFIRM UNDOCK";
+        btn.classList.add("armed");
+        armedTimer = setTimeout(disarmOffer, 3000);
+        return;
+      }
+      disarmOffer();                      // second tap confirms
+      depart(c);
+    });
     box.appendChild(div);
   });
 

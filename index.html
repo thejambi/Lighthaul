@@ -37,7 +37,10 @@
     padding: 10px 12px;
     backdrop-filter: blur(3px);
     text-shadow: 0 0 6px rgba(143,233,255,.35);
+    z-index: 3;                 /* above the floating station labels */
   }
+  /* station labels sit behind the panels (occluded when they overlap) */
+  #labels { position: absolute; inset: 0; z-index: 2; }
 
   #stats { top: 14px; left: 14px; min-width: 250px; }
   #stats .row { display: flex; justify-content: space-between; gap: 18px; line-height: 1.55; font-size: 13px; }
@@ -96,11 +99,11 @@
   .landmark.target { color: var(--gold); }
   .landmark.target .dot { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
 
-  #toast { position: absolute; top: calc(50% - 60px); left: 50%; transform: translateX(-50%);
+  #toast { position: absolute; top: calc(50% - 60px); left: 50%; transform: translateX(-50%); z-index: 4;
     font-size: 20px; letter-spacing: 2px; color: #fff; opacity: 0; transition: opacity .25s;
     text-shadow: 0 0 14px rgba(143,233,255,.7); }
   #toast.on { opacity: .95; }
-  #viewmode { position: absolute; top: calc(50% + 40px); left: 50%; transform: translateX(-50%);
+  #viewmode { position: absolute; top: calc(50% + 40px); left: 50%; transform: translateX(-50%); z-index: 4;
     font-size: 12px; letter-spacing: 3px; color: var(--warn); opacity: 0;
     text-shadow: 0 0 10px rgba(255,106,90,.6); transition: opacity .2s; }
   #viewmode.on { opacity: .9; }
@@ -114,14 +117,17 @@
   /* ---------- full-screen game screens ---------- */
   .screen {
     position: fixed; inset: 0; z-index: 30; overflow-y: auto;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 16px;
     background: radial-gradient(ellipse at center, rgba(4,12,20,.55), rgba(0,2,6,.94));
     backdrop-filter: blur(3px);
   }
   .screen.hiddenS { display: none; }
-  .card { max-width: 660px; width: calc(100% - 32px); padding: 26px 30px;
+  /* margin:auto centers the card when it fits and top-aligns it (scrollable,
+     no clipped header) when it overflows a short viewport */
+  .card { max-width: 660px; width: 100%; padding: 26px 30px; margin: auto;
     background: linear-gradient(180deg, rgba(8,20,28,.85), rgba(4,10,16,.8));
-    border: 1px solid rgba(143,233,255,.3); border-radius: 12px; margin: 24px 0; }
+    border: 1px solid rgba(143,233,255,.3); border-radius: 12px; }
   .card h1 { color: #fff; font-size: 28px; margin: 0 0 4px; letter-spacing: 1px; text-shadow: 0 0 24px rgba(143,233,255,.4); }
   .card h2 { color: #fff; font-size: 19px; margin: 0 0 4px; letter-spacing: .5px; }
   .card p { color: var(--hud-dim); font-size: 13px; line-height: 1.8; }
@@ -151,6 +157,41 @@
 
   .good { color: var(--ok); } .bad { color: var(--warn); } .gold-t { color: var(--gold); }
   .go { margin-top: 14px; color: var(--hud); font-size: 14px; animation: pulse 1.6s infinite; }
+
+  /* ---- mobile / touch (tuned for iPhone SE, 375×667) ---- */
+  @media (max-width: 640px), (pointer: coarse) {
+    /* menu / station / results cards */
+    .card { padding: 18px 16px; }
+    .card h1 { font-size: 23px; }
+    .card h2 { font-size: 16px; }
+    .card p { font-size: 12px; line-height: 1.7; }
+    .stat-line { font-size: 12px; line-height: 1.7; }
+    .offer { padding: 10px 12px; margin: 8px 0; }
+    .offer .t { font-size: 13px; }
+    .offer .t .pay { float: none; display: block; margin-top: 2px; }
+    .offer .sub { font-size: 11px; }
+    .btn { padding: 10px 14px; font-size: 12px; margin: 4px 6px 0 0; }
+    .go { font-size: 13px; }
+
+    /* flight HUD: stats top-left, throttle top-right, contract full-width bottom */
+    .panel { padding: 7px 9px; backdrop-filter: blur(2px); }
+    #stats { top: 8px; left: 8px; min-width: 0; transform: scale(.82); transform-origin: top left; }
+    #stats .big { font-size: 18px; }
+    #stats .row { font-size: 12px; gap: 10px; }
+
+    #throttleWrap { top: 8px; right: 6px; width: 52px; height: 40vh; }
+    #throttleBar { width: 28px; }
+
+    #contract { top: auto; bottom: 8px; left: 8px; right: 8px; transform: none; min-width: 0; }
+    #contract .dest { font-size: 14px; }
+    #contract .row { font-size: 11px; gap: 10px; }
+
+    /* keyboard cheatsheet is desktop-only; effects toggles are tucked away */
+    #help { display: none; }
+    #effects { display: none; }
+    #reticle { opacity: .35; }
+    #toast { font-size: 16px; top: 30%; }
+  }
 </style>
 </head>
 <body>

@@ -830,7 +830,12 @@ function updateLabels() {
     aberrateDir(_dir, _fwd, beta, _ab);
     _proj.copy(ship.pos).addScaledVector(_ab, dist);
     _proj.project(camera);
-    if (_proj.z > 1 || _proj.z < -1) { st.el.style.display = "none"; continue; }
+    // hide behind-camera and near-edge labels so no clipped text hugs the edges
+    // (x is tighter because the labels are wide horizontal text)
+    if (_proj.z > 1 || _proj.z < -1 ||
+        _proj.x < -0.9 || _proj.x > 0.9 || _proj.y < -0.96 || _proj.y > 0.96) {
+      st.el.style.display = "none"; continue;
+    }
     const x = (_proj.x * 0.5 + 0.5) * window.innerWidth;
     const y = (-_proj.y * 0.5 + 0.5) * window.innerHeight;
     st.el.style.display = "block";

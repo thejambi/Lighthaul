@@ -385,6 +385,7 @@ function depart(c) {
   ship.quat.setFromUnitVectors(new THREE.Vector3(0, 0, -1), _dir);
   el("c-dest").textContent = stations[c.to].name;
   el("c-age-row").style.display = c.type === "passenger" ? "flex" : "none";
+  disarmTow();
   setPhase("flight");
   showToast("undocked — " + stations[c.to].name);
 }
@@ -552,6 +553,25 @@ for (const [k, id] of Object.entries(fxRows)) {
 document.querySelector("#effects .snd").style.pointerEvents = "auto";
 document.querySelector("#effects .snd").addEventListener("click", () => { audio.toggleMute(); updateSoundIndicator(); });
 
+// touch action buttons (mobile): mute + a confirm-then-fire tow
+el("btn-mute").addEventListener("click", () => { audio.toggleMute(); updateSoundIndicator(); });
+let towArmed = false, towTimer = null;
+function disarmTow() {
+  towArmed = false; clearTimeout(towTimer);
+  const b = el("btn-tow"); b.textContent = "TOW"; b.classList.remove("armed");
+}
+el("btn-tow").addEventListener("click", () => {
+  if (game.phase !== "flight") return;
+  const b = el("btn-tow");
+  if (!towArmed) {                 // first tap arms; forfeiting a contract shouldn't be a fat-finger
+    towArmed = true; b.textContent = "SURE?"; b.classList.add("armed");
+    clearTimeout(towTimer); towTimer = setTimeout(disarmTow, 2500);
+    return;
+  }
+  disarmTow();
+  callTow();
+});
+
 function toggleUI() {
   uiHidden = !uiHidden;
   el("hud").style.opacity = uiHidden ? 0.06 : 1;
@@ -559,6 +579,8 @@ function toggleUI() {
 function updateSoundIndicator() {
   const s = el("sound-state");
   if (s) s.textContent = audio.isMuted() ? "muted" : "on";
+  const b = el("btn-mute");
+  if (b) b.textContent = audio.isMuted() ? "🔇" : "🔊";
 }
 
 const SPEED_PRESETS = [0, 0.5, 0.9, 0.99, 0.9999];
@@ -801,7 +823,7 @@ function updateHUD(gamma, dist, coordRate) {
     status = "⚠ CUT THROTTLE — braking distance";
     cls = "brake";
   } else if (game.fuel <= 0) {
-    status = "FUEL EXPENDED — press R for a tow";
+    status = "FUEL EXPENDED — call a tow (R / button)";
     cls = "brake";
   }
   hud.cStatus.textContent = status;

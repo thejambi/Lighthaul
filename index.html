@@ -78,6 +78,15 @@
     background: linear-gradient(0deg, #1b6f8a, #5fe6ff); transition: height .05s linear; }
   #throttleWrap .pct { font-size: 11px; margin-top: 6px; color: var(--hud); }
 
+  /* touch action buttons — desktop hides these (keyboard R / M cover them) */
+  #actions { position: absolute; display: none; flex-direction: column; gap: 8px; z-index: 3; }
+  #actions button { pointer-events: auto; cursor: pointer; font: inherit; font-size: 12px;
+    letter-spacing: 1px; color: var(--hud); background: rgba(8,20,28,.75);
+    border: 1px solid rgba(143,233,255,.35); border-radius: 8px; padding: 10px 0; text-align: center;
+    backdrop-filter: blur(3px); }
+  #actions #btn-tow { color: var(--warn); border-color: rgba(255,106,90,.45); }
+  #actions #btn-tow.armed { color: #fff; background: rgba(122,27,27,.8); animation: pulse .6s infinite; }
+
   #reticle { position: absolute; top: 50%; left: 50%; width: 42px; height: 42px; transform: translate(-50%,-50%); opacity: .5; }
   #reticle::before, #reticle::after { content:""; position:absolute; background: rgba(143,233,255,.55); }
   #reticle::before { left:50%; top:0; width:1px; height:100%; transform:translateX(-.5px); }
@@ -182,6 +191,9 @@
     #throttleWrap { top: 8px; right: 6px; width: 52px; height: 40vh; }
     #throttleBar { width: 28px; }
 
+    /* tow + mute reachable below the throttle */
+    #actions { display: flex; top: calc(40vh + 22px); right: 6px; width: 52px; }
+
     #contract { top: auto; bottom: 8px; left: 8px; right: 8px; transform: none; min-width: 0; }
     #contract .dest { font-size: 14px; }
     #contract .row { font-size: 11px; gap: 10px; }
@@ -221,7 +233,7 @@
         <button class="btn" id="st-retire">RETIRE NOW</button>
       </div>
       <p style="margin-top:12px; font-size:11px">Accepting a contract undocks you aimed at the destination.
-         Cut throttle in time — you dock below <b>0.20c</b> within <b>15 ly</b>. <b>R</b> calls a tow if you're stranded.</p>
+         Cut throttle in time — you dock below <b>0.20c</b> within <b>15 ly</b>. The <b>TOW</b> button (or <b>R</b>) recovers you if you're stranded.</p>
     </div>
   </div>
 
@@ -271,6 +283,12 @@
       <div class="label">THRUST</div>
       <div id="throttleBar"><div id="throttleFill"></div></div>
       <div class="pct" id="throttlePct">0%</div>
+    </div>
+
+    <!-- touch action buttons (shown on mobile; keyboard covers these on desktop) -->
+    <div id="actions">
+      <button id="btn-mute" title="mute">🔊</button>
+      <button id="btn-tow" title="call a recovery tow">TOW</button>
     </div>
 
     <div id="reticle"></div>

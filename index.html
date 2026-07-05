@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Lighthaul — a relativistic courier game</title>
+<style>
+  :root {
+    --hud: #8fe9ff;
+    --hud-dim: #5a8fa0;
+    --warn: #ff6a5a;
+    --ok: #8dff9e;
+    --gold: #ffd76a;
+    --bg: #000308;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg);
+    overscroll-behavior: none; }
+  body {
+    font-family: "SFMono-Regular", ui-monospace, "Menlo", "Consolas", monospace;
+    color: var(--hud);
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: crosshair;
+  }
+  canvas { display: block; touch-action: none; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  body:not(.flight) #hud { display: none; }
+
+  .panel {
+    position: absolute;
+    background: linear-gradient(180deg, rgba(8,20,28,.72), rgba(4,10,16,.62));
+    border: 1px solid rgba(143,233,255,.25);
+    border-radius: 8px;
+    padding: 10px 12px;
+    backdrop-filter: blur(3px);
+    text-shadow: 0 0 6px rgba(143,233,255,.35);
+  }
+
+  #stats { top: 14px; left: 14px; min-width: 250px; }
+  #stats .row { display: flex; justify-content: space-between; gap: 18px; line-height: 1.55; font-size: 13px; }
+  #stats .row .k { color: var(--hud-dim); }
+  #stats .row .v { color: var(--hud); font-variant-numeric: tabular-nums; }
+  #stats .big { font-size: 22px; letter-spacing: .5px; }
+  #stats .big .v { color: #fff; }
+  #stats hr { border: none; border-top: 1px solid rgba(143,233,255,.15); margin: 7px 0; }
+  /* delta-v (fuel) bar */
+  #fuelBar { position: relative; height: 10px; border: 1px solid rgba(143,233,255,.3); border-radius: 5px;
+    overflow: hidden; background: rgba(0,0,0,.4); margin-top: 4px; }
+  #fuelFill { position: absolute; inset: 0; right: auto; width: 100%;
+    background: linear-gradient(90deg, #8a5a1b, #ffd76a); }
+  #fuelBar.low #fuelFill { background: linear-gradient(90deg, #7a1b1b, #ff6a5a); }
+
+  /* contract tracker */
+  #contract { top: 14px; left: 50%; transform: translateX(-50%); min-width: 300px; }
+  #contract .hd { font-size: 10px; color: var(--hud-dim); letter-spacing: 1px; margin-bottom: 4px; }
+  #contract .dest { font-size: 16px; color: #fff; margin-bottom: 6px; text-shadow: 0 0 8px rgba(143,233,255,.4); }
+  #contract .row { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.5; gap: 16px; }
+  #contract .row .k { color: var(--hud-dim); }
+  #contract .row .v { color: var(--hud); font-variant-numeric: tabular-nums; }
+  #contract .row .v.pay { color: var(--gold); }
+  #contract .row .v.bad { color: var(--warn); }
+  #contract .status { margin-top: 6px; font-size: 11px; letter-spacing: 1px; text-align: center; min-height: 14px; }
+  #contract .status.brake { color: var(--warn); animation: pulse 0.7s infinite; }
+  #contract .status.dockable { color: var(--ok); }
+
+  /* throttle */
+  #throttleWrap { top: 14px; right: 14px; width: 56px; height: 260px; display: flex; flex-direction: column; align-items: center; }
+  #throttleWrap .label { font-size: 10px; color: var(--hud-dim); margin-bottom: 6px; letter-spacing: 1px; }
+  #throttleBar { position: relative; flex: 1; width: 22px; border: 1px solid rgba(143,233,255,.3); border-radius: 11px; overflow: hidden; background: rgba(0,0,0,.4);
+    pointer-events: auto; cursor: ns-resize; touch-action: none; }
+  #throttleFill { position: absolute; bottom: 0; left: 0; right: 0; height: 0%;
+    background: linear-gradient(0deg, #1b6f8a, #5fe6ff); transition: height .05s linear; }
+  #throttleWrap .pct { font-size: 11px; margin-top: 6px; color: var(--hud); }
+
+  #reticle { position: absolute; top: 50%; left: 50%; width: 42px; height: 42px; transform: translate(-50%,-50%); opacity: .5; }
+  #reticle::before, #reticle::after { content:""; position:absolute; background: rgba(143,233,255,.55); }
+  #reticle::before { left:50%; top:0; width:1px; height:100%; transform:translateX(-.5px); }
+  #reticle::after  { top:50%; left:0; height:1px; width:100%; transform:translateY(-.5px); }
+
+  #help { bottom: 14px; left: 14px; font-size: 12px; line-height: 1.7; max-width: 380px; color: var(--hud-dim); }
+  #help b { color: var(--hud); }
+  #help .title { color: #fff; font-size: 13px; margin-bottom: 4px; }
+
+  #effects { bottom: 14px; right: 14px; font-size: 11px; line-height: 1.7; text-align: right; color: var(--hud-dim); }
+  #effects .on { color: var(--ok); }
+  #effects .snd { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(143,233,255,.15); color: var(--hud-dim); }
+  #effects .snd b { color: var(--hud); }
+
+  .landmark { position: absolute; transform: translate(-50%,-50%); font-size: 11px; color: #bfefff;
+    text-shadow: 0 0 6px rgba(0,0,0,.9); white-space: nowrap; pointer-events: none; }
+  .landmark .dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:#bfefff; margin-right:5px; vertical-align: middle; box-shadow: 0 0 6px #bfefff; }
+  .landmark .d { color: var(--hud-dim); font-size:10px; margin-left:6px; }
+  .landmark.target { color: var(--gold); }
+  .landmark.target .dot { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+
+  #toast { position: absolute; top: calc(50% - 60px); left: 50%; transform: translateX(-50%);
+    font-size: 20px; letter-spacing: 2px; color: #fff; opacity: 0; transition: opacity .25s;
+    text-shadow: 0 0 14px rgba(143,233,255,.7); }
+  #toast.on { opacity: .95; }
+  #viewmode { position: absolute; top: calc(50% + 40px); left: 50%; transform: translateX(-50%);
+    font-size: 12px; letter-spacing: 3px; color: var(--warn); opacity: 0;
+    text-shadow: 0 0 10px rgba(255,106,90,.6); transition: opacity .2s; }
+  #viewmode.on { opacity: .9; }
+  @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+  #gveil { position: fixed; inset: 0; pointer-events: none; z-index: 4; opacity: 0;
+    background: radial-gradient(ellipse 70% 70% at center,
+      rgba(0,0,0,0) 35%, rgba(20,0,0,.55) 72%, rgba(0,0,0,.95) 100%); }
+  #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 5; }
+
+  /* ---------- full-screen game screens ---------- */
+  .screen {
+    position: fixed; inset: 0; z-index: 30; overflow-y: auto;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(4,12,20,.55), rgba(0,2,6,.94));
+    backdrop-filter: blur(3px);
+  }
+  .screen.hiddenS { display: none; }
+  .card { max-width: 660px; width: calc(100% - 32px); padding: 26px 30px;
+    background: linear-gradient(180deg, rgba(8,20,28,.85), rgba(4,10,16,.8));
+    border: 1px solid rgba(143,233,255,.3); border-radius: 12px; margin: 24px 0; }
+  .card h1 { color: #fff; font-size: 28px; margin: 0 0 4px; letter-spacing: 1px; text-shadow: 0 0 24px rgba(143,233,255,.4); }
+  .card h2 { color: #fff; font-size: 19px; margin: 0 0 4px; letter-spacing: .5px; }
+  .card p { color: var(--hud-dim); font-size: 13px; line-height: 1.8; }
+  .card p b { color: var(--hud); }
+  .stat-line { font-size: 13px; color: var(--hud-dim); margin: 8px 0 14px; }
+  .stat-line b { color: #fff; }
+
+  .btn {
+    display: inline-block; pointer-events: auto; cursor: pointer;
+    font: inherit; font-size: 13px; letter-spacing: 1px;
+    color: var(--hud); background: rgba(143,233,255,.08);
+    border: 1px solid rgba(143,233,255,.4); border-radius: 6px;
+    padding: 8px 16px; margin: 4px 6px 4px 0;
+  }
+  .btn:hover { background: rgba(143,233,255,.18); color: #fff; }
+  .btn.gold { color: var(--gold); border-color: rgba(255,215,106,.5); background: rgba(255,215,106,.07); }
+  .btn.gold:hover { background: rgba(255,215,106,.16); color: #fff; }
+  .btn[disabled] { opacity: .35; pointer-events: none; }
+
+  .offer { border: 1px solid rgba(143,233,255,.2); border-radius: 8px; padding: 12px 14px; margin: 10px 0;
+    background: rgba(0,0,0,.25); }
+  .offer .t { color: #fff; font-size: 14px; margin-bottom: 3px; }
+  .offer .t .pay { color: var(--gold); float: right; }
+  .offer .sub { color: var(--hud-dim); font-size: 12px; line-height: 1.7; }
+  .offer .sub b { color: var(--hud); }
+  .offer .warn-need { color: var(--warn); }
+
+  .good { color: var(--ok); } .bad { color: var(--warn); } .gold-t { color: var(--gold); }
+  .go { margin-top: 14px; color: var(--hud); font-size: 14px; animation: pulse 1.6s infinite; }
+</style>
+</head>
+<body>
+
+  <!-- TITLE -->
+  <div id="title" class="screen">
+    <div class="card" style="text-align:center">
+      <h1>LIGHTHAUL</h1>
+      <p style="margin-top:2px; letter-spacing:2px; color:var(--hud)">A RELATIVISTIC COURIER GAME</p>
+      <p>Haul cargo and passengers between stations at a hair under light speed.
+         <b>Fuel is Δv</b> — it diverges as you push toward <i>c</i>, and you must budget the braking burn.
+         <b>Deadlines run on universe time</b>, so fly fast on average.
+         <b>Passengers age on ship time</b>, so keep γ high to keep them young.
+         And <b>so do you</b> — every year aboard is a year off your career. Retire rich, not old.</p>
+      <div class="go" id="title-go">▶ click or press any key to report for duty</div>
+    </div>
+  </div>
+
+  <!-- STATION -->
+  <div id="station" class="screen hiddenS">
+    <div class="card">
+      <h2 id="st-name">Station</h2>
+      <div class="stat-line" id="st-stats"></div>
+      <div id="st-offers"></div>
+      <div style="margin-top:14px">
+        <button class="btn gold" id="st-refuel">REFUEL</button>
+        <button class="btn" id="st-retire">RETIRE NOW</button>
+      </div>
+      <p style="margin-top:12px; font-size:11px">Accepting a contract undocks you aimed at the destination.
+         Cut throttle in time — you dock below <b>0.20c</b> within <b>15 ly</b>. <b>R</b> calls a tow if you're stranded.</p>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results" class="screen hiddenS">
+    <div class="card">
+      <h2 id="rs-title">Delivery</h2>
+      <div id="rs-body" class="stat-line" style="line-height:2"></div>
+      <button class="btn gold" id="rs-continue">CONTINUE</button>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="gameover" class="screen hiddenS">
+    <div class="card">
+      <h2 id="go-title">Retirement</h2>
+      <div id="go-body" class="stat-line" style="line-height:2"></div>
+      <button class="btn gold" id="go-new">START A NEW CAREER</button>
+    </div>
+  </div>
+
+  <!-- FLIGHT HUD -->
+  <div id="hud">
+    <div id="stats" class="panel">
+      <div class="row big"><span class="k">SPEED</span><span class="v" id="s-pct">0.000 %c</span></div>
+      <div class="row"><span class="k">β (v/c)</span><span class="v" id="s-beta">0.000000</span></div>
+      <div class="row"><span class="k">γ Lorentz</span><span class="v" id="s-gamma">1.0000</span></div>
+      <div class="row"><span class="k">thrust</span><span class="v" id="s-gforce">0.0 g</span></div>
+      <hr/>
+      <div class="row"><span class="k">pilot age</span><span class="v" id="s-age">28.0 yr</span></div>
+      <div class="row"><span class="k">credits</span><span class="v" id="s-credits">₡0</span></div>
+      <div class="row"><span class="k">Δv budget</span><span class="v" id="s-fuel">0.0</span></div>
+      <div id="fuelBar"><div id="fuelFill"></div></div>
+    </div>
+
+    <div id="contract" class="panel">
+      <div class="hd">ACTIVE CONTRACT</div>
+      <div class="dest" id="c-dest">—</div>
+      <div class="row"><span class="k">distance</span><span class="v" id="c-dist">—</span></div>
+      <div class="row"><span class="k">deadline (universe)</span><span class="v" id="c-deadline">—</span></div>
+      <div class="row" id="c-age-row" style="display:none"><span class="k">passenger aged</span><span class="v" id="c-aging">—</span></div>
+      <div class="row"><span class="k">payment</span><span class="v pay" id="c-pay">—</span></div>
+      <div class="status" id="c-status"></div>
+    </div>
+
+    <div id="throttleWrap" class="panel">
+      <div class="label">THRUST</div>
+      <div id="throttleBar"><div id="throttleFill"></div></div>
+      <div class="pct" id="throttlePct">0%</div>
+    </div>
+
+    <div id="reticle"></div>
+    <div id="toast"></div>
+    <div id="viewmode">◂ LOOKING ASTERN ▸</div>
+
+    <div id="help" class="panel">
+      <div class="title">FLIGHT CONTROLS</div>
+      <b>Mouse</b> steer (drag) · <b>W/S</b> throttle ± · <b>Q/E</b> roll · <b>Shift</b> turbo<br/>
+      <b>Space</b> cut thrust · <b>V</b> speed presets · <b>B</b> (hold) look astern<br/>
+      <b>R</b> call tow · <b>M</b> mute · <b>H</b> hide UI · <b>1–5</b> toggle effects
+    </div>
+
+    <div id="effects" class="panel">
+      <div>relativistic effects</div>
+      <div id="fx-aberr">aberration</div>
+      <div id="fx-doppler">doppler shift</div>
+      <div id="fx-beam">beaming</div>
+      <div id="fx-contract">length contraction</div>
+      <div id="fx-cmb">CMB hotspot</div>
+      <div class="snd">sound <b id="sound-state">on</b> · <b>M</b> mute</div>
+    </div>
+
+    <div id="labels"></div>
+  </div>
+
+  <div id="gveil"></div>
+  <div id="flash"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

@@ -47,7 +47,6 @@ const TANK = 14;             // Δv budget in rapidity units (scarce — can't m
 const FUEL_PRICE = 20;       // credits per rapidity unit
 const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
-const AP_SLOW = 130;        // ly over which the autopilot bleeds off speed to dock
 const LOAD_K = 9;           // maneuvering accel -> felt inertial load (g)
 const DMG_RATE = 0.10;      // integrity lost per (g over rating) per second
 
@@ -633,6 +632,7 @@ const input = { yaw: 0, pitch: 0, roll: 0 };
 let uiHidden = false;
 let started = false;
 let autopilotAssist = false;   // easter-egg "docking assist" — auto-cuts throttle to dock
+let apBraking = false;         // set each frame when the assist is actively braking
 
 const audio = createAudio();
 
@@ -894,17 +894,27 @@ function update(dt) {
   shipForward(_fwd);
   const omegaTurn = Math.acos(THREE.MathUtils.clamp(_prevFwd.dot(_fwd), -1, 1)) / Math.max(dt, 1e-4);
 
-  // --- autopilot docking assist (easter egg): as you close on the target, cap
-  // the throttle so speed bleeds off smoothly and you arrive slow enough to dock.
+  // --- autopilot docking assist (easter egg): hold cruise until the latest safe
+  // moment, then brake to hit dock speed right at the dock radius. The braking
+  // rate is the hardest the cargo's inertial rating allows, so it slows as late
+  // as possible (minimal wasted time / aging).
+  apBraking = false;
   if (autopilotAssist && game.fuel > 0) {
     const apTgt = stations[game.contract.to];
     const apDist = apTgt.pos.distanceTo(ship.pos);
     _dir.copy(apTgt.pos).sub(ship.pos).normalize();
-    if (_fwd.dot(_dir) > 0.2 && apDist < AP_SLOW + DOCK_RADIUS) {
-      // desired β reaches ~0 only well inside the dock radius, so the ship keeps
-      // drifting in slowly (below dock speed) rather than halting short of it
-      const desired = THREE.MathUtils.clamp((apDist - DOCK_RADIUS * 0.4) / AP_SLOW, 0, 1);
-      ship.throttle = Math.min(ship.throttle, betaToThrottle(desired));
+    if (_fwd.dot(_dir) > 0.2 && apDist < 600) {
+      const g = lorentz(ship.beta);
+      const gp = GAMMA_CAP * Math.tanh(g / GAMMA_CAP);
+      // deceleration in β-per-ly that keeps the inertial load under ~70% of the
+      // rating (load ≈ k·β·PROPER_RATE·gp·LOAD_K), capped so it's never abrupt
+      const k = Math.min(0.05, 0.7 * game.contract.gLimit /
+                (LOAD_K * Math.max(ship.beta, DOCK_BETA) * PROPER_RATE * gp));
+      // target β falls linearly with distance, reaching ~0.14c (just under dock
+      // speed) at the dock radius; only bite when it's below the current throttle
+      const targetBeta = 0.14 + k * Math.max(0, apDist - DOCK_RADIUS);
+      const cap = betaToThrottle(Math.min(1, targetBeta));
+      if (cap < ship.throttle) { ship.throttle = cap; apBraking = true; }
     }
   }
 
@@ -1055,7 +1065,7 @@ function updateHUD(gamma, dist, coordRate) {
   } else if (bearing < 0) {
     status = "⚠ TARGET ASTERN — turn back to the marker";
     cls = "brake";
-  } else if (autopilotAssist && bearing > 0.2 && dist < AP_SLOW + DOCK_RADIUS) {
+  } else if (apBraking) {
     status = "◈ AUTOPILOT DOCKING…";
     cls = "dockable";
   } else if (dist < brakeDist) {

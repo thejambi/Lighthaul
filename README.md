@@ -44,6 +44,16 @@ forfeits the contract and costs years of your life.
 Between runs you refuel (credits per rapidity unit) and pick from three
 procedurally generated contracts. Retire rich, not old.
 
+**Outfitting.** Every dock stocks a fixed pair of upgrades, so the map is worth
+learning — you travel to where the outfit you want is sold. Each buys up in a
+few escalating tiers: a **Fuel Cell Array** (+Δv capacity, for one bigger leg), a
+**Drive Efficiency** reactor (−fuel burned per Δv, stretching the whole tank),
+**Inertial Dampers** (−felt maneuvering load, so you can burn and brake harder
+without stressing fragile freight), a **Broker License** (+pay on every
+contract), a **Rejuv Course** (+years before mandatory retirement — buy more
+career), and a **Docking Assist** that auto-brakes you to a clean dock. Levels
+persist across the career and show as badges on the flight HUD.
+
 **Star chart** (the ★ button at a dock) is a trip planner: a top-down map of the
 cluster with your open contracts as gold routes. Pick a cruise speed and tap any
 station to see that leg's real cost — distance, Δv (vs. your tank), universe-time,

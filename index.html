@@ -52,6 +52,10 @@
   #autoBadge { color: var(--ok); background: rgba(8,24,16,.85); border: 1px solid rgba(141,255,158,.5);
     text-shadow: 0 0 8px rgba(141,255,158,.5); }
   #autoBadge.flash { animation: pulse .5s 3; }
+  #upgradeBadge { color: var(--hud); background: rgba(8,20,28,.85); border: 1px solid rgba(143,233,255,.45);
+    text-shadow: 0 0 8px rgba(143,233,255,.4); letter-spacing: 2px; }
+  #upgradeBadge .rl { font-size: 9px; vertical-align: super; margin-left: 1px; letter-spacing: 0; color: var(--gold); }
+  #upgradeBadge .bsep { margin: 0 5px; color: var(--hud-dim); }
   #stats .row { display: flex; justify-content: space-between; gap: 18px; line-height: 1.55; font-size: 13px; }
   #stats .row .k { color: var(--hud-dim); }
   #stats .row .v { color: var(--hud); font-variant-numeric: tabular-nums; }
@@ -197,6 +201,23 @@
   .offer .sub b.frag { color: var(--warn); }
   .offer .warn-need { color: var(--warn); }
 
+  /* outfitting shop */
+  #st-shop { margin-top: 16px; }
+  .shop-hd { font-size: 11px; letter-spacing: 1.5px; color: var(--hud-dim); margin-bottom: 6px;
+    border-top: 1px solid rgba(143,233,255,.15); padding-top: 12px; }
+  .shop-row { display: flex; align-items: center; gap: 12px; padding: 9px 12px; margin: 7px 0;
+    border: 1px solid rgba(143,233,255,.2); border-radius: 8px; background: rgba(0,0,0,.25); }
+  .shop-ic { font-size: 17px; color: var(--gold); width: 18px; text-align: center; flex: none;
+    text-shadow: 0 0 8px rgba(255,215,106,.4); }
+  .shop-main { flex: 1; font-size: 13px; color: #fff; line-height: 1.35; }
+  .shop-desc { display: block; font-size: 11px; color: var(--hud-dim); }
+  .pips { display: inline-block; margin-left: 6px; white-space: nowrap; }
+  .pip { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin: 0 1px;
+    border: 1px solid rgba(143,233,255,.5); vertical-align: middle; }
+  .pip.on { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 5px rgba(255,215,106,.6); }
+  .shop-buy { margin: 0; padding: 8px 14px; flex: none; }
+  .shop-max { font-size: 11px; letter-spacing: 1px; color: var(--ok); flex: none; }
+
   /* star map */
   #map-speeds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   .mapspd { pointer-events: auto; cursor: pointer; font: inherit; font-size: 12px;
@@ -287,6 +308,7 @@
       <h2 id="st-name">Station</h2>
       <div class="stat-line" id="st-stats"></div>
       <div id="st-offers"></div>
+      <div id="st-shop"></div>
       <div style="margin-top:14px">
         <button class="btn" id="st-map">★ STAR CHART</button>
         <button class="btn gold" id="st-refuel">REFUEL</button>
@@ -350,6 +372,7 @@
     </div>
     <div id="badges">
       <div id="autoBadge" class="badge">◈ DOCKING ASSIST</div>
+      <div id="upgradeBadge" class="badge up"></div>
     </div>
     </div><!-- /tl-stack -->
 

@@ -41,7 +41,7 @@ composer.addPass(new OutputPass());
 // ---------------------------------------------------------------------------
 // Game state
 // ---------------------------------------------------------------------------
-const START_AGE = 28;
+const START_AGE = 22;
 const RETIRE_AGE = 82;      // rejuvenation-era flight certification, not a deathbed
 const TANK = 14;             // Δv budget in rapidity units (scarce — can't max every leg)
 const FUEL_PRICE = 20;       // credits per rapidity unit
@@ -50,6 +50,18 @@ const DOCK_BETA = 0.2;
 const AP_DECEL = 0.14;      // autopilot throttle-down rate = the S-key rate
 const LOAD_K = 9;           // maneuvering accel -> felt inertial load (g)
 const DMG_RATE = 0.10;      // integrity lost per (g over rating) per second
+
+// Ship outfits, bought at a dock. Levels persist across the career and tune the
+// core dials. `costs` is the price of each successive tier (its length = max
+// level). Each station stocks a fixed pair, so the map is worth learning.
+const UPGRADES = {
+  tank:      { icon: "⬢", name: "Fuel Cell Array", desc: "+3 Δv tank capacity",        costs: [200, 320, 460, 620] },
+  drive:     { icon: "⚡", name: "Drive Efficiency", desc: "−12% fuel burned per Δv",     costs: [240, 400, 560] },
+  damper:    { icon: "◇", name: "Inertial Dampers", desc: "−15% felt maneuvering load",  costs: [260, 420, 600] },
+  broker:    { icon: "✦", name: "Broker License",   desc: "+8% pay on every contract",   costs: [280, 460, 640] },
+  rejuv:     { icon: "✚", name: "Rejuv Course",      desc: "+6 yr before retirement",     costs: [300, 460, 640, 840] },
+  autopilot: { icon: "◈", name: "Docking Assist",   desc: "auto-brakes to a clean dock", costs: [500], oneShot: true },
+};
 
 const game = {
   phase: "title",             // title | station | flight | results | over
@@ -63,6 +75,7 @@ const game = {
   offers: [],
   contract: null,
   integrity: 1,               // cargo/passenger condition on the current run (0..1)
+  upgrades: { tank: 0, drive: 0, damper: 0, broker: 0, rejuv: 0, autopilot: 0 },
   lastResult: null,
 };
 
@@ -106,6 +119,16 @@ function apBrakeDistance(beta0) {
   }
   return dist;
 }
+
+// --- upgrade effects: each derived dial folds in the owned level. Kept as live
+// getters (not baked constants) so buying mid-career takes effect immediately.
+const UP_KEYS = Object.keys(UPGRADES);
+function tankCap()   { return TANK + game.upgrades.tank * 3; }          // Δv capacity
+function retireAge() { return RETIRE_AGE + game.upgrades.rejuv * 6; }   // career length
+function loadFactor(){ return 1 - game.upgrades.damper * 0.15; }        // felt maneuvering load ×
+function fuelFactor(){ return 1 - game.upgrades.drive * 0.12; }         // fuel burned ×
+function payMult()   { return 1 + game.upgrades.broker * 0.08; }        // contract pay ×
+function contractPay(c) { return Math.round(c.pay * payMult()); }
 
 // ---------------------------------------------------------------------------
 // Star layers (engine copy)
@@ -282,6 +305,21 @@ const stations = [{ name: stationName(), pos: new THREE.Vector3(0, 0, 0) }];
   }
 }
 
+// Each dock stocks a fixed pair of outfits, so different places sell different
+// upgrades — the map is worth learning. Guarantee every upgrade is sold somewhere.
+stations.forEach((s) => {
+  const a = _pick(UP_KEYS);
+  let b = _pick(UP_KEYS);
+  while (b === a) b = _pick(UP_KEYS);
+  s.shop = [a, b];
+});
+UP_KEYS.forEach((k) => {
+  if (!stations.some((s) => s.shop.includes(k))) {
+    const s = _pick(stations);
+    s.shop[(Math.random() * 2) | 0] = k;
+  }
+});
+
 // HTML labels for stations (aberration-aware, target highlighted)
 const labelsRoot = document.getElementById("labels");
 for (const st of stations) {
@@ -373,9 +411,9 @@ function buildStation() {
   const s = stations[game.station];
   el("st-name").textContent = "Docked · " + s.name;
   el("st-stats").innerHTML =
-    `pilot age <b>${game.pilotAge.toFixed(1)}</b> / retires ${RETIRE_AGE}` +
+    `pilot age <b>${game.pilotAge.toFixed(1)}</b> / retires ${retireAge()}` +
     ` &nbsp;·&nbsp; credits <b class="gold-t">₡${game.credits}</b>` +
-    ` &nbsp;·&nbsp; Δv <b>${game.fuel.toFixed(1)}</b> / ${TANK}` +
+    ` &nbsp;·&nbsp; Δv <b>${game.fuel.toFixed(1)}</b> / ${tankCap()}` +
     ` &nbsp;·&nbsp; deliveries <b>${game.deliveries}</b>`;
 
   const box = el("st-offers");
@@ -390,7 +428,7 @@ function buildStation() {
                                : ` · rugged: ${c.gLimit}g rating`;
     div.innerHTML =
       `<div class="t">${c.type === "cargo" ? "FREIGHT — " + c.what : "PASSAGE — " + c.what}` +
-      `<span class="pay">₡${c.pay}</span></div>` +
+      `<span class="pay">₡${contractPay(c)}</span></div>` +
       `<div class="sub">to <b>${stations[c.to].name}</b> · ${c.d.toFixed(0)} ly · ` +
       `deadline ${fmtY(c.deadline)} (universe) · ${need}${frag}</div>` +
       `<button class="btn" data-i="${i}">ACCEPT & UNDOCK</button>`;
@@ -410,15 +448,56 @@ function buildStation() {
     box.appendChild(div);
   });
 
-  const missing = TANK - game.fuel;
+  const missing = tankCap() - game.fuel;
   const cost = Math.ceil(missing * FUEL_PRICE);
   const rf = el("st-refuel");
   rf.textContent = missing < 0.05 ? "TANK FULL" : `REFUEL (₡${cost})`;
   rf.disabled = missing < 0.05;
+
+  buildShop();
+}
+
+// --- outfitting: this dock's two stocked upgrades, with tier pips + buy buttons
+function buildShop() {
+  const box = el("st-shop");
+  let html = '<div class="shop-hd">OUTFITTING · this dock stocks</div>';
+  for (const k of stations[game.station].shop) {
+    const u = UPGRADES[k];
+    const lv = game.upgrades[k];
+    const max = u.costs.length;
+    // autopilot counts as owned if the easter egg already switched it on
+    const owned = k === "autopilot" ? (lv > 0 || autopilotAssist) : lv >= max;
+    const cost = u.costs[lv];
+    let pips = "";
+    if (!u.oneShot) for (let i = 0; i < max; i++) pips += `<span class="pip ${i < lv ? "on" : ""}"></span>`;
+    let ctrl;
+    if (owned) ctrl = `<span class="shop-max">${u.oneShot ? "OWNED" : "MAX"}</span>`;
+    else {
+      const afford = game.credits >= cost;
+      ctrl = `<button class="btn ${afford ? "gold" : ""} shop-buy" data-k="${k}"${afford ? "" : " disabled"}>₡${cost}</button>`;
+    }
+    html += `<div class="shop-row"><span class="shop-ic">${u.icon}</span>` +
+      `<span class="shop-main"><b>${u.name}</b><span class="pips">${pips}</span>` +
+      `<span class="shop-desc">${u.desc}</span></span>${ctrl}</div>`;
+  }
+  box.innerHTML = html;
+  box.querySelectorAll(".shop-buy").forEach((b) => b.addEventListener("click", () => buyUpgrade(b.dataset.k)));
+}
+
+function buyUpgrade(k) {
+  const lv = game.upgrades[k];
+  const cost = UPGRADES[k].costs[lv];
+  if (cost === undefined || game.credits < cost) return;
+  game.credits -= cost;
+  game.upgrades[k] = lv + 1;
+  if (k === "autopilot") { autopilotAssist = true; updateAutopilotIndicator(false); }
+  updateBadges();
+  buildStation();               // re-render stats, offer pay, and shop
+  showEggToast(`${UPGRADES[k].icon} ${UPGRADES[k].name} installed`);
 }
 
 el("st-refuel").addEventListener("click", () => {
-  const missing = TANK - game.fuel;
+  const missing = tankCap() - game.fuel;
   const affordable = Math.min(missing, game.credits / FUEL_PRICE);
   game.fuel += affordable;
   game.credits -= Math.ceil(affordable * FUEL_PRICE);
@@ -506,7 +585,7 @@ function selectMapNode(i) {
       : `age cap ${c.maxAging.toFixed(1)} yr — need γ ≥ ${(c.d / c.maxAging).toFixed(1)}`;
     const meets = c.type === "cargo" ? uni <= c.deadline : aged <= c.maxAging;
     html += `<span class="k">${c.type === "cargo" ? "FREIGHT" : "PASSAGE"}</span> ${c.what} · ` +
-            `<span class="gold-t">₡${c.pay}</span> · ${c.gLimit}g<br/>` +
+            `<span class="gold-t">₡${contractPay(c)}</span> · ${c.gLimit}g<br/>` +
             `<span class="${meets ? "good" : "bad"}">${meets ? "✓ meets" : "✗ misses"}</span> ${need}` +
             ` <button class="btn ${meets ? "gold" : ""}" id="map-accept" style="margin-left:8px;padding:5px 12px">ACCEPT</button>`;
   } else {
@@ -550,6 +629,7 @@ function depart(c) {
   ship.quat.setFromUnitVectors(new THREE.Vector3(0, 0, -1), _dir);
   el("c-dest").textContent = stations[c.to].name;
   el("c-age-row").style.display = c.type === "passenger" ? "flex" : "none";
+  updateBadges();
   disarmTow();
   setPhase("flight");
   showToast("undocked — " + stations[c.to].name);
@@ -559,7 +639,7 @@ function dock() {
   const c = game.contract;
   const usedCoord = ship.coordTime - c.acceptCoord;
   const usedShip = ship.shipTime - c.acceptShip;
-  let pay = c.pay, ok = true;
+  let pay = contractPay(c), ok = true;
   const notes = [];
   if (usedCoord > c.deadline) {
     ok = false; pay = Math.round(pay * 0.25);
@@ -598,7 +678,7 @@ function callTow() {
   game.credits = Math.max(0, game.credits - cost);
   game.pilotAge += 4;
   ship.shipTime += 4;
-  game.fuel = Math.max(game.fuel, TANK * 0.5);
+  game.fuel = Math.max(game.fuel, tankCap() * 0.5);
   game.station = nearest;
   game.failures++;
   game.lastResult = { kind: "tow", cost, c, nearest };
@@ -627,12 +707,12 @@ function buildResults() {
   }
 }
 el("rs-continue").addEventListener("click", () => {
-  if (game.pilotAge >= RETIRE_AGE) setPhase("over");
+  if (game.pilotAge >= retireAge()) setPhase("over");
   else setPhase("station");
 });
 
 function buildGameOver() {
-  const forced = game.pilotAge >= RETIRE_AGE;
+  const forced = game.pilotAge >= retireAge();
   el("go-title").textContent = forced ? "Mandatory retirement" : "Retired";
   el("go-body").innerHTML =
     `You hung up the flight suit at <b>${game.pilotAge.toFixed(1)}</b>.<br/>` +
@@ -694,6 +774,19 @@ function updateAutopilotIndicator(doFlash) {
   const b = el("autoBadge");
   b.classList.toggle("on", autopilotAssist);
   if (doFlash) { b.classList.remove("flash"); void b.offsetWidth; b.classList.add("flash"); }
+}
+
+// Owned outfits shown as a compact HUD badge (autopilot has its own green badge).
+const ROMAN = ["", "I", "II", "III", "IV"];
+function updateBadges() {
+  const b = el("upgradeBadge");
+  const owned = UP_KEYS.filter((k) => k !== "autopilot" && game.upgrades[k] > 0);
+  b.classList.toggle("on", owned.length > 0);
+  if (owned.length) {
+    b.innerHTML = owned
+      .map((k) => `${UPGRADES[k].icon}<span class="rl">${ROMAN[game.upgrades[k]]}</span>`)
+      .join("<span class='bsep'>·</span>");
+  }
 }
 let eggToastTimer = null;
 function showEggToast(text) {
@@ -963,7 +1056,7 @@ function update(dt) {
   const phi = rapidity(ship.beta);
   const dphi = Math.abs(phi - dyn.prevPhi);
   dyn.prevPhi = phi;
-  if (dphi > 0) game.fuel = Math.max(0, game.fuel - dphi);
+  if (dphi > 0) game.fuel = Math.max(0, game.fuel - dphi * fuelFactor());
 
   // --- pilot-frame pacing: universe time & distance scale with γ (capped) ---
   const gPace = GAMMA_CAP * Math.tanh(gamma / GAMMA_CAP);
@@ -1002,8 +1095,8 @@ function update(dt) {
   // you're burning/braking plus a little turning). Bounded, unlike the raw γ³ term.
   const coordAccel = (ship.beta - dyn.prevBeta) / Math.max(dt, 1e-4);
   dyn.prevBeta = ship.beta;
-  const loadTarget = Math.abs(coordAccel) * LOAD_K +
-                     THREE.MathUtils.clamp(omegaTurn * ship.beta * 5, 0, 10);
+  const loadTarget = (Math.abs(coordAccel) * LOAD_K +
+                     THREE.MathUtils.clamp(omegaTurn * ship.beta * 5, 0, 10)) * loadFactor();
   dyn.load += (loadTarget - dyn.load) * Math.min(1, dt * 5);
 
   // exceed the contract's inertial rating and you damage the load
@@ -1061,9 +1154,10 @@ function updateHUD(gamma, dist, coordRate) {
   hud.gforce.style.color = over ? "var(--warn)" : dyn.load > game.contract.gLimit * 0.8 ? "var(--gold)" : "var(--hud)";
   hud.age.textContent = game.pilotAge.toFixed(1) + " yr";
   hud.credits.textContent = "₡" + game.credits;
-  hud.fuel.textContent = game.fuel.toFixed(1) + " / " + TANK;
-  hud.fuelFill.style.width = (game.fuel / TANK * 100).toFixed(1) + "%";
-  hud.fuelBar.classList.toggle("low", game.fuel < TANK * 0.2);
+  const cap = tankCap();
+  hud.fuel.textContent = game.fuel.toFixed(1) + " / " + cap;
+  hud.fuelFill.style.width = (game.fuel / cap * 100).toFixed(1) + "%";
+  hud.fuelBar.classList.toggle("low", game.fuel < cap * 0.2);
 
   hud.throttleFill.style.height = (ship.throttle * 100) + "%";
   hud.throttlePct.textContent = game.fuel <= 0 ? "DEAD STICK" : Math.round(ship.throttle * 100) + "%";
@@ -1085,7 +1179,7 @@ function updateHUD(gamma, dist, coordRate) {
   hud.cInteg.className = "v" + (game.integrity < 0.6 ? " bad" : "");
   hud.integFill.style.width = integPct + "%";
   hud.integBar.classList.toggle("hurt", game.integrity < 0.6);
-  hud.cPay.textContent = "₡" + c.pay;
+  hud.cPay.textContent = "₡" + contractPay(c);
 
   // status line: braking guidance & docking
   const lyPerSec = ship.beta * coordRate;              // current ly per real second

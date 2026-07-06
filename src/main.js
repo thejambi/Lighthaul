@@ -662,24 +662,45 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => keys.delete(e.code));
 
-// --- easter egg: the Konami code toggles the docking assist (a hand for new
-// pilots — it auto-cuts the throttle so you always dock cleanly). ↑↑↓↓←→←→ B A
-const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
-                "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "KeyB", "KeyA"];
-let konamiIdx = 0;
-window.addEventListener("keydown", (e) => {
-  konamiIdx = e.code === KONAMI[konamiIdx] ? konamiIdx + 1 : (e.code === KONAMI[0] ? 1 : 0);
-  if (konamiIdx === KONAMI.length) {
-    konamiIdx = 0;
-    autopilotAssist = !autopilotAssist;
-    updateAutopilotIndicator(true);
-  }
-});
+// --- easter egg: the docking assist (a hand for new pilots — it auto-brakes so
+// you always dock cleanly). Enable it with the Konami code on a keyboard, or by
+// tapping the station header five times on touch.
+function toggleAutopilot() {
+  autopilotAssist = !autopilotAssist;
+  updateAutopilotIndicator(true);
+  showEggToast(autopilotAssist ? "◈ DOCKING ASSIST ON" : "docking assist off");
+}
 function updateAutopilotIndicator(doFlash) {
   const b = el("autoBadge");
   b.classList.toggle("on", autopilotAssist);
   if (doFlash) { b.classList.remove("flash"); void b.offsetWidth; b.classList.add("flash"); }
 }
+let eggToastTimer = null;
+function showEggToast(text) {
+  const t = el("eggToast");
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(eggToastTimer);
+  eggToastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+}
+
+// keyboard: Konami code  ↑ ↑ ↓ ↓ ← → ← → B A
+const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
+                "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "KeyB", "KeyA"];
+let konamiIdx = 0;
+window.addEventListener("keydown", (e) => {
+  konamiIdx = e.code === KONAMI[konamiIdx] ? konamiIdx + 1 : (e.code === KONAMI[0] ? 1 : 0);
+  if (konamiIdx === KONAMI.length) { konamiIdx = 0; toggleAutopilot(); }
+});
+
+// touch: tap the "Docked · …" station header 5 times quickly
+let headerTaps = 0, headerTapTimer = null;
+el("st-name").addEventListener("click", () => {
+  headerTaps++;
+  clearTimeout(headerTapTimer);
+  headerTapTimer = setTimeout(() => (headerTaps = 0), 1200);
+  if (headerTaps >= 5) { headerTaps = 0; toggleAutopilot(); }
+});
 
 // drag steering (mouse + touch)
 let dragging = false, dragId = null, lastX = 0, lastY = 0;

@@ -42,7 +42,16 @@
   /* station labels sit behind the panels (occluded when they overlap) */
   #labels { position: absolute; inset: 0; z-index: 2; }
 
-  #stats { top: 14px; left: 14px; min-width: 250px; }
+  /* top-left column: the SPEED stats box + a stack of status badges below it */
+  #tl-stack { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column;
+    align-items: flex-start; gap: 8px; z-index: 3; }
+  #stats { position: static; min-width: 250px; }
+  #badges { display: flex; flex-direction: column; gap: 6px; }
+  .badge { display: none; padding: 4px 12px; font-size: 11px; letter-spacing: 1.5px; border-radius: 14px; }
+  .badge.on { display: block; }
+  #autoBadge { color: var(--ok); background: rgba(8,24,16,.85); border: 1px solid rgba(141,255,158,.5);
+    text-shadow: 0 0 8px rgba(141,255,158,.5); }
+  #autoBadge.flash { animation: pulse .5s 3; }
   #stats .row { display: flex; justify-content: space-between; gap: 18px; line-height: 1.55; font-size: 13px; }
   #stats .row .k { color: var(--hud-dim); }
   #stats .row .v { color: var(--hud); font-variant-numeric: tabular-nums; }
@@ -137,13 +146,12 @@
     background: radial-gradient(ellipse 70% 70% at center,
       rgba(0,0,0,0) 35%, rgba(20,0,0,.55) 72%, rgba(0,0,0,.95) 100%); }
   #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 5; }
-  /* easter-egg docking-assist badge (shown on all screens when active) */
-  #autoBadge { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 40;
-    display: none; padding: 4px 12px; font-size: 11px; letter-spacing: 2px; color: var(--ok);
-    background: rgba(8,24,16,.85); border: 1px solid rgba(141,255,158,.5); border-radius: 20px;
-    text-shadow: 0 0 8px rgba(141,255,158,.6); pointer-events: none; }
-  #autoBadge.on { display: block; }
-  #autoBadge.flash { animation: pulse .5s 3; }
+  /* transient easter-egg toggle confirmation (works on any screen) */
+  #eggToast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 45;
+    padding: 6px 16px; font-size: 13px; letter-spacing: 1.5px; color: var(--ok);
+    background: rgba(8,24,16,.92); border: 1px solid rgba(141,255,158,.5); border-radius: 20px;
+    text-shadow: 0 0 8px rgba(141,255,158,.6); pointer-events: none; opacity: 0; transition: opacity .3s; }
+  #eggToast.show { opacity: 1; }
 
   /* ---------- full-screen game screens ---------- */
   .screen {
@@ -233,7 +241,9 @@
 
     /* flight HUD: stats top-left, throttle top-right, contract full-width bottom */
     .panel { padding: 7px 9px; backdrop-filter: blur(2px); }
-    #stats { top: 8px; left: 8px; min-width: 0; transform: scale(.82); transform-origin: top left; }
+    /* scale the whole stack (stats + badges) so the badges stay tight below */
+    #tl-stack { top: 8px; left: 8px; transform: scale(.82); transform-origin: top left; }
+    #stats { min-width: 0; }
     #stats .big { font-size: 18px; }
     #stats .row { font-size: 12px; gap: 10px; }
 
@@ -326,6 +336,7 @@
 
   <!-- FLIGHT HUD -->
   <div id="hud">
+    <div id="tl-stack">
     <div id="stats" class="panel">
       <div class="row big"><span class="k">SPEED</span><span class="v" id="s-pct">0.000 %c</span></div>
       <div class="row"><span class="k">β (v/c)</span><span class="v" id="s-beta">0.000000</span></div>
@@ -337,6 +348,10 @@
       <div class="row"><span class="k">Δv budget</span><span class="v" id="s-fuel">0.0</span></div>
       <div id="fuelBar"><div id="fuelFill"></div></div>
     </div>
+    <div id="badges">
+      <div id="autoBadge" class="badge">◈ DOCKING ASSIST</div>
+    </div>
+    </div><!-- /tl-stack -->
 
     <div id="contract" class="panel">
       <div class="hd">ACTIVE CONTRACT</div>
@@ -395,7 +410,7 @@
 
   <div id="gveil"></div>
   <div id="flash"></div>
-  <div id="autoBadge">◈ DOCKING ASSIST</div>
+  <div id="eggToast"></div>
 
   <script type="importmap">
   {

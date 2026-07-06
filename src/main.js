@@ -44,7 +44,9 @@ composer.addPass(new OutputPass());
 const START_AGE = 22;
 const RETIRE_AGE = 82;      // rejuvenation-era flight certification, not a deathbed
 const TANK = 14;             // Δv budget in rapidity units (scarce — can't max every leg)
-const FUEL_PRICE = 20;       // credits per rapidity unit
+const FUEL_PRICE = 20;       // base credits per rapidity unit (before bulk discount)
+const FUEL_BULK_DISC = 0.02; // discount per Δv unit in the fill-up...
+const FUEL_MAX_DISC = 0.35;  // ...capped here. Big fills (a large tank run low) are cheapest.
 const LOW_FUEL = 6;          // Δv below which the dock nags you to refuel (see buildStation)
 const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
@@ -130,6 +132,13 @@ function loadFactor(){ return 1 - game.upgrades.damper * 0.15; }        // felt 
 function fuelFactor(){ return 1 - game.upgrades.drive * 0.12; }         // fuel burned ×
 function payMult()   { return 1 + game.upgrades.broker * 0.08; }        // contract pay ×
 function contractPay(c) { return Math.round(c.pay * payMult()); }
+
+// bulk fuel discount: the per-Δv price drops with the size of the fill-up. Δv is
+// rapidity, so brake fuel is capacity-independent — a big tank you let run low
+// before topping off buys the cheapest fuel.
+function fuelDiscount(qty) { return Math.min(FUEL_MAX_DISC, Math.max(0, qty) * FUEL_BULK_DISC); }
+function fuelUnitPrice(qty) { return FUEL_PRICE * (1 - fuelDiscount(qty)); }
+function fuelCost(qty) { return Math.ceil(qty * fuelUnitPrice(qty)); }
 
 // ---------------------------------------------------------------------------
 // Star layers (engine copy)
@@ -363,14 +372,17 @@ function makeContracts(fromIdx) {
         pay: Math.round((90 + d * (0.9 + (betaReq - 0.5) * 3.2)) * (1 + Math.max(0, 11 - gLimit) * 0.05)),
       });
     } else {
-      // passenger: ship-time aging cap — requires a minimum average gamma
-      const gReq = 4 + Math.random() * 26;
-      const gLimit = Math.round(3 + Math.random() * 5);          // 3–8 g (humans)
+      // passenger: ship-time aging cap — requires a minimum average gamma. Kept
+      // humane: γ demands top out near 0.997c (not an impossible 0.9993c), and
+      // the cap carries a fixed +slack for the accel/brake ramp — which ages them
+      // at low γ, worse the gentler (lower-g) the ramp has to be.
+      const gReq = 4 + Math.random() * 12;                       // need average γ ≈ 3–13
+      const gLimit = Math.round(4 + Math.random() * 4);          // 4–8 g (humans)
       offers.push({
         type: "passenger", what: _pick(PAX), to: t, d, gLimit,
-        deadline: d / 0.7 + 8,
-        maxAging: d / gReq * 1.15 + 0.6,
-        pay: Math.round((160 + d * (0.7 + gReq * 0.14)) * (1 + Math.max(0, 8 - gLimit) * 0.06)),
+        deadline: d / 0.7 + 10,
+        maxAging: d / gReq * 1.25 + 1.5,
+        pay: Math.round((160 + d * (0.7 + gReq * 0.2)) * (1 + Math.max(0, 8 - gLimit) * 0.06)),
       });
     }
   }
@@ -450,9 +462,13 @@ function buildStation() {
   });
 
   const missing = tankCap() - game.fuel;
-  const cost = Math.ceil(missing * FUEL_PRICE);
   const rf = el("st-refuel");
-  rf.textContent = missing < 0.05 ? "TANK FULL" : `REFUEL (₡${cost})`;
+  if (missing < 0.05) {
+    rf.textContent = "TANK FULL";
+  } else {
+    const disc = Math.round(fuelDiscount(missing) * 100);
+    rf.textContent = disc >= 3 ? `REFUEL ₡${fuelCost(missing)} · −${disc}%` : `REFUEL (₡${fuelCost(missing)})`;
+  }
   rf.disabled = missing < 0.05;
 
   // low-Δv reminder: fuel is rapidity, so the cost to accelerate-and-brake a leg
@@ -511,9 +527,11 @@ function buyUpgrade(k) {
 
 el("st-refuel").addEventListener("click", () => {
   const missing = tankCap() - game.fuel;
-  const affordable = Math.min(missing, game.credits / FUEL_PRICE);
+  if (missing < 0.05) return;
+  const unit = fuelUnitPrice(missing);          // bulk rate set by the size of the fill
+  const affordable = Math.min(missing, game.credits / unit);
   game.fuel += affordable;
-  game.credits -= Math.ceil(affordable * FUEL_PRICE);
+  game.credits -= Math.ceil(affordable * unit);
   buildStation();
 });
 el("st-retire").addEventListener("click", () => setPhase("over"));

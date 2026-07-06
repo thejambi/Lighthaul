@@ -47,6 +47,7 @@ const TANK = 14;             // Δv budget in rapidity units (scarce — can't m
 const FUEL_PRICE = 20;       // credits per rapidity unit
 const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
+const AP_DECEL = 0.14;      // autopilot throttle-down rate = the S-key rate
 const LOAD_K = 9;           // maneuvering accel -> felt inertial load (g)
 const DMG_RATE = 0.10;      // integrity lost per (g over rating) per second
 
@@ -88,6 +89,23 @@ function betaToThrottle(b) {
   return 1 - Math.cbrt(1 - Math.min(b, C_CAP));
 }
 const rapidity = (b) => Math.atanh(Math.min(b, C_CAP));
+
+// Forward-simulate "holding S" from a given speed to find how many ly it takes
+// to bleed down to dock speed — i.e. the distance out at which the autopilot must
+// start braking. Mirrors the real throttle/β/pacing dynamics from update().
+function apBrakeDistance(beta0) {
+  let beta = beta0;
+  let throttle = betaToThrottle(beta0);
+  let dist = 0;
+  const h = 0.05;                       // integration step (= the game's dt cap)
+  for (let i = 0; i < 2000 && beta > DOCK_BETA; i++) {
+    throttle = Math.max(0, throttle - AP_DECEL * h);
+    beta += (throttleToBeta(throttle) - beta) * Math.min(1, h * 2.5);
+    const gp = GAMMA_CAP * Math.tanh(lorentz(beta) / GAMMA_CAP);
+    dist += beta * PROPER_RATE * gp * h;
+  }
+  return dist;
+}
 
 // ---------------------------------------------------------------------------
 // Star layers (engine copy)
@@ -526,6 +544,7 @@ function depart(c) {
   dyn.prevBeta = 0;
   dyn.prevPhi = 0;
   dyn.load = 0;
+  apBraking = false;
   // undock aimed at the destination
   _dir.copy(stations[c.to].pos).sub(ship.pos).normalize();
   ship.quat.setFromUnitVectors(new THREE.Vector3(0, 0, -1), _dir);
@@ -667,6 +686,7 @@ window.addEventListener("keyup", (e) => keys.delete(e.code));
 // tapping the station header five times on touch.
 function toggleAutopilot() {
   autopilotAssist = !autopilotAssist;
+  if (!autopilotAssist) apBraking = false;
   updateAutopilotIndicator(true);
   showEggToast(autopilotAssist ? "◈ DOCKING ASSIST ON" : "docking assist off");
 }
@@ -915,27 +935,24 @@ function update(dt) {
   shipForward(_fwd);
   const omegaTurn = Math.acos(THREE.MathUtils.clamp(_prevFwd.dot(_fwd), -1, 1)) / Math.max(dt, 1e-4);
 
-  // --- autopilot docking assist (easter egg): hold cruise until the latest safe
-  // moment, then brake to hit dock speed right at the dock radius. The braking
-  // rate is the hardest the cargo's inertial rating allows, so it slows as late
-  // as possible (minimal wasted time / aging).
-  apBraking = false;
+  // --- autopilot docking assist (easter egg): behaves exactly like holding the
+  // S key — a steady throttle-down at the normal rate — kicked off at the precise
+  // distance where that brings you to dock speed right at the 15 ly mark. The
+  // start point is found by forward-simulating the hold-S trajectory.
   if (autopilotAssist && game.fuel > 0) {
     const apTgt = stations[game.contract.to];
     const apDist = apTgt.pos.distanceTo(ship.pos);
     _dir.copy(apTgt.pos).sub(ship.pos).normalize();
-    if (_fwd.dot(_dir) > 0.2 && apDist < 600) {
-      const g = lorentz(ship.beta);
-      const gp = GAMMA_CAP * Math.tanh(g / GAMMA_CAP);
-      // deceleration in β-per-ly that keeps the inertial load under ~70% of the
-      // rating (load ≈ k·β·PROPER_RATE·gp·LOAD_K), capped so it's never abrupt
-      const k = Math.min(0.05, 0.7 * game.contract.gLimit /
-                (LOAD_K * Math.max(ship.beta, DOCK_BETA) * PROPER_RATE * gp));
-      // target β falls linearly with distance, reaching ~0.14c (just under dock
-      // speed) at the dock radius; only bite when it's below the current throttle
-      const targetBeta = 0.14 + k * Math.max(0, apDist - DOCK_RADIUS);
-      const cap = betaToThrottle(Math.min(1, targetBeta));
-      if (cap < ship.throttle) { ship.throttle = cap; apBraking = true; }
+    if (_fwd.dot(_dir) > 0.2) {
+      if (!apBraking && ship.beta > DOCK_BETA && apDist < 200 &&
+          apDist - DOCK_RADIUS <= apBrakeDistance(ship.beta)) {
+        apBraking = true;
+      }
+      if (apBraking) {
+        // hold "S": steady throttle-down, floored at a slow drift so the ship
+        // keeps creeping into the dock rather than stopping short of it
+        ship.throttle = Math.max(betaToThrottle(0.15), ship.throttle - AP_DECEL * dt);
+      }
     }
   }
 

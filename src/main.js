@@ -45,6 +45,7 @@ const START_AGE = 22;
 const RETIRE_AGE = 82;      // rejuvenation-era flight certification, not a deathbed
 const TANK = 14;             // Δv budget in rapidity units (scarce — can't max every leg)
 const FUEL_PRICE = 20;       // credits per rapidity unit
+const LOW_FUEL = 6;          // Δv below which the dock nags you to refuel (see buildStation)
 const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
 const AP_DECEL = 0.14;      // autopilot throttle-down rate = the S-key rate
@@ -453,6 +454,18 @@ function buildStation() {
   const rf = el("st-refuel");
   rf.textContent = missing < 0.05 ? "TANK FULL" : `REFUEL (₡${cost})`;
   rf.disabled = missing < 0.05;
+
+  // low-Δv reminder: fuel is rapidity, so the cost to accelerate-and-brake a leg
+  // doesn't shrink with a bigger tank — the threshold is absolute (~a 0.99c round
+  // trip: 2·atanh .99 − atanh .2 ≈ 5.1, plus a little margin). Nags + pulses the
+  // refuel button so a player doesn't undock into a dead stick.
+  const low = game.fuel < LOW_FUEL;
+  const lf = el("st-lowfuel");
+  lf.style.display = low ? "block" : "none";
+  if (low) lf.innerHTML =
+    `⚠ LOW Δv — <b>${game.fuel.toFixed(1)}</b> in the tank. A fast leg (~0.99c out and brake) ` +
+    `burns about <b>5</b>; top up before you undock or you risk a dead stick.`;
+  rf.classList.toggle("urge", low && !rf.disabled);
 
   buildShop();
 }

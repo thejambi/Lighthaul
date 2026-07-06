@@ -201,6 +201,12 @@
   .offer .sub b.frag { color: var(--warn); }
   .offer .warn-need { color: var(--warn); }
 
+  /* low-Δv refuel reminder */
+  .lowfuel { margin: 10px 0 2px; padding: 9px 13px; border: 1px solid rgba(255,106,90,.5);
+    border-radius: 8px; background: rgba(48,12,10,.4); color: var(--warn); font-size: 12.5px; line-height: 1.6; }
+  .lowfuel b { color: #fff; }
+  .btn.urge { animation: pulse 1s infinite; }
+
   /* outfitting shop */
   #st-shop { margin-top: 16px; }
   .shop-hd { font-size: 11px; letter-spacing: 1.5px; color: var(--hud-dim); margin-bottom: 6px;
@@ -307,6 +313,7 @@
     <div class="card">
       <h2 id="st-name">Station</h2>
       <div class="stat-line" id="st-stats"></div>
+      <div id="st-lowfuel" class="lowfuel" style="display:none"></div>
       <div id="st-offers"></div>
       <div id="st-shop"></div>
       <div style="margin-top:14px">

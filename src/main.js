@@ -42,7 +42,7 @@ composer.addPass(new OutputPass());
 // Game state
 // ---------------------------------------------------------------------------
 const START_AGE = 28;
-const RETIRE_AGE = 68;
+const RETIRE_AGE = 82;      // rejuvenation-era flight certification, not a deathbed
 const TANK = 14;             // Δv budget in rapidity units (scarce — can't max every leg)
 const FUEL_PRICE = 20;       // credits per rapidity unit
 const DOCK_RADIUS = 15;      // ly
@@ -246,6 +246,8 @@ function coreName() {
 }
 function stationName() { return coreName() + " " + _pick(_SUFFIX); }
 
+// A compact cluster keeps hops short enough that a career is many deliveries,
+// not a couple of doomed voyages (a 500 ly hop ages you centuries below ~0.999c).
 const stations = [{ name: stationName(), pos: new THREE.Vector3(0, 0, 0) }];
 {
   let guard = 0;
@@ -254,9 +256,9 @@ const stations = [{ name: stationName(), pos: new THREE.Vector3(0, 0, 0) }];
       (Math.random() * 2 - 1),
       (Math.random() * 2 - 1) * 0.5,
       (Math.random() * 2 - 1)
-    ).multiplyScalar(620);
-    if (p.length() < 70) continue;
-    if (stations.every((s) => s.pos.distanceTo(p) > 100)) {
+    ).multiplyScalar(170);
+    if (p.length() < 30) continue;
+    if (stations.every((s) => s.pos.distanceTo(p) > 40)) {
       stations.push({ name: stationName(), pos: p });
     }
   }

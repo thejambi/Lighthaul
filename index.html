@@ -75,12 +75,22 @@
   #contract .status.dockable { color: var(--ok); }
 
   /* throttle */
-  #throttleWrap { top: 14px; right: 14px; width: 56px; height: 260px; display: flex; flex-direction: column; align-items: center; }
+  #throttleWrap { top: 14px; right: 14px; width: 60px; height: 260px; display: flex; flex-direction: column; align-items: center; }
   #throttleWrap .label { font-size: 10px; color: var(--hud-dim); margin-bottom: 6px; letter-spacing: 1px; }
-  #throttleBar { position: relative; flex: 1; width: 22px; border: 1px solid rgba(143,233,255,.3); border-radius: 11px; overflow: hidden; background: rgba(0,0,0,.4);
-    pointer-events: auto; cursor: ns-resize; touch-action: none; }
+  #throttleBar { position: relative; flex: 1; width: 30px; border: 1px solid rgba(143,233,255,.3); border-radius: 15px; overflow: hidden; background: rgba(0,0,0,.4);
+    pointer-events: auto; cursor: pointer; touch-action: none; }
   #throttleFill { position: absolute; bottom: 0; left: 0; right: 0; height: 0%;
     background: linear-gradient(0deg, #1b6f8a, #5fe6ff); transition: height .05s linear; }
+  /* hold-to-ramp zones layered over the bar */
+  .tz { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: center;
+    color: rgba(191,239,255,.55); font-size: 9px; letter-spacing: 1px; line-height: 1; pointer-events: none;
+    text-shadow: 0 0 4px rgba(0,0,0,.9); }
+  .tz-uu { top: 0; height: 15%; }
+  .tz-u  { top: 15%; height: 35%; }
+  .tz-d  { top: 50%; height: 35%; }
+  .tz-dd { top: 85%; height: 15%; }
+  .tz.active { color: #fff; background: rgba(143,233,255,.28); }
+  .tz-uu, .tz-dd { color: var(--gold); }          /* turbo zones */
   #throttleWrap .pct { font-size: 11px; margin-top: 6px; color: var(--hud); }
 
   /* touch action buttons — desktop hides these (keyboard R / M cover them) */
@@ -196,11 +206,12 @@
     #stats .big { font-size: 18px; }
     #stats .row { font-size: 12px; gap: 10px; }
 
-    #throttleWrap { top: 8px; right: 6px; width: 52px; height: 40vh; }
-    #throttleBar { width: 28px; }
+    #throttleWrap { top: 8px; right: 6px; width: 56px; height: 44vh; }
+    #throttleBar { width: 40px; }
+    .tz { font-size: 11px; }
 
     /* tow + mute reachable below the throttle */
-    #actions { display: flex; top: calc(40vh + 22px); right: 6px; width: 52px; }
+    #actions { display: flex; top: calc(44vh + 22px); right: 6px; width: 56px; }
 
     #contract { top: auto; bottom: 8px; left: 8px; right: 8px; transform: none; min-width: 0; }
     #contract .dest { font-size: 14px; }
@@ -291,7 +302,13 @@
 
     <div id="throttleWrap" class="panel">
       <div class="label">THRUST</div>
-      <div id="throttleBar"><div id="throttleFill"></div></div>
+      <div id="throttleBar">
+        <div id="throttleFill"></div>
+        <div class="tz tz-uu">▲▲</div>
+        <div class="tz tz-u">▲</div>
+        <div class="tz tz-d">▼</div>
+        <div class="tz tz-dd">▼▼</div>
+      </div>
       <div class="pct" id="throttlePct">0%</div>
     </div>
 

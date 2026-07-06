@@ -566,21 +566,47 @@ window.addEventListener("pointerup", (e) => {
 });
 
 // throttle bar drag
+// Press-and-hold zones on the thrust bar ramp the throttle while held (like
+// W / Shift+W), instead of jumping to the tapped position — precise on touch.
+// Zones top→bottom: turbo-up (0–15%), up (15–50%), down (50–85%), turbo-down.
 const throttleBarEl = el("throttleBar");
-let throttleDrag = false;
-function setThrottleFromPointer(clientY) {
+let throttleHeld = false;
+let touchThrottleRate = 0;   // signed throttle delta per second from the held zone
+let activeZoneEl = null;
+function zoneFromPointer(clientY) {
   const r = throttleBarEl.getBoundingClientRect();
-  ship.throttle = Math.max(0, Math.min(1, 1 - (clientY - r.top) / r.height));
+  const frac = (clientY - r.top) / r.height;   // 0 = top, 1 = bottom
+  if (frac < 0.15) return [0.56, ".tz-uu"];
+  if (frac < 0.50) return [0.14, ".tz-u"];
+  if (frac < 0.85) return [-0.14, ".tz-d"];
+  return [-0.56, ".tz-dd"];
+}
+function setZone(clientY) {
+  const [rate, sel] = zoneFromPointer(clientY);
+  touchThrottleRate = rate;
+  const zEl = throttleBarEl.querySelector(sel);
+  if (zEl !== activeZoneEl) {
+    if (activeZoneEl) activeZoneEl.classList.remove("active");
+    activeZoneEl = zEl;
+    if (activeZoneEl) activeZoneEl.classList.add("active");
+  }
+}
+function clearZone() {
+  throttleHeld = false;
+  touchThrottleRate = 0;
+  if (activeZoneEl) { activeZoneEl.classList.remove("active"); activeZoneEl = null; }
 }
 throttleBarEl.addEventListener("pointerdown", (e) => {
   if (game.phase !== "flight") return;
-  throttleDrag = true;
+  throttleHeld = true;
   try { throttleBarEl.setPointerCapture(e.pointerId); } catch (_) {}
-  setThrottleFromPointer(e.clientY);
+  setZone(e.clientY);
   e.preventDefault();
 });
-throttleBarEl.addEventListener("pointermove", (e) => { if (throttleDrag) setThrottleFromPointer(e.clientY); });
-throttleBarEl.addEventListener("pointerup", () => { throttleDrag = false; });
+throttleBarEl.addEventListener("pointermove", (e) => { if (throttleHeld) setZone(e.clientY); });
+throttleBarEl.addEventListener("pointerup", clearZone);
+throttleBarEl.addEventListener("pointercancel", clearZone);
+window.addEventListener("pointerup", () => { if (throttleHeld) clearZone(); });
 
 // effect-row taps
 const fx = { aberration: 1, doppler: 1, beaming: 1, contraction: 1, cmb: 1 };
@@ -705,6 +731,7 @@ function update(dt) {
   const rate = 0.14 * turbo;
   if (keys.has("KeyW") || keys.has("ArrowUp")) ship.throttle += rate * dt;
   if (keys.has("KeyS") || keys.has("ArrowDown")) ship.throttle -= rate * dt;
+  if (touchThrottleRate) ship.throttle += touchThrottleRate * dt; // held thrust-bar zone
   if (keys.has("Space")) ship.throttle = 0;
   ship.throttle = Math.max(0, Math.min(1, ship.throttle));
 

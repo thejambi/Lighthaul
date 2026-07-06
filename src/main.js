@@ -324,7 +324,9 @@ function makeContracts(fromIdx) {
 // Phase / screens
 // ---------------------------------------------------------------------------
 const el = (id) => document.getElementById(id);
-const screens = { title: el("title"), station: el("station"), results: el("results"), over: el("gameover") };
+// #starmap is listed so setPhase hides it on any real transition; it's never a
+// phase itself — it's opened as an overlay on the station screen.
+const screens = { title: el("title"), station: el("station"), results: el("results"), over: el("gameover"), map: el("starmap") };
 
 function setPhase(p) {
   game.phase = p;
@@ -405,6 +407,115 @@ el("st-refuel").addEventListener("click", () => {
   buildStation();
 });
 el("st-retire").addEventListener("click", () => setPhase("over"));
+
+// ---------------------------------------------------------------------------
+// Star chart — a trip planner. Nodes are stations; gold routes are open
+// contracts. Pick a cruise speed and tap a station to see the leg's real cost.
+// ---------------------------------------------------------------------------
+let mapBeta = 0.999;
+let mapSelected = -1;
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function openMap() {
+  mapSelected = -1;
+  buildStarMap();
+  el("map-detail").innerHTML = '<span class="dim">Tap a station to plan the leg.</span>';
+  el("map-title").textContent = "Star Chart · " + stations[game.station].name;
+  el("starmap").classList.remove("hiddenS");
+}
+function closeMap() { el("starmap").classList.add("hiddenS"); }
+
+function buildStarMap() {
+  const svg = el("map-svg");
+  const pad = 12, W = 100, H = 100;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const s of stations) {
+    minX = Math.min(minX, s.pos.x); maxX = Math.max(maxX, s.pos.x);
+    minZ = Math.min(minZ, s.pos.z); maxZ = Math.max(maxZ, s.pos.z);
+  }
+  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+  const span = Math.max(maxX - minX, maxZ - minZ, 1) * 1.02;
+  const X = (x) => W / 2 + (x - cx) / span * (W - 2 * pad);
+  const Y = (z) => H / 2 + (z - cz) / span * (H - 2 * pad);
+  stations.forEach((s) => { s._mx = X(s.pos.x); s._my = Y(s.pos.z); });
+
+  let out = "";
+  const dock = stations[game.station];
+  for (const c of game.offers) {
+    const b = stations[c.to];
+    out += `<line x1="${dock._mx}" y1="${dock._my}" x2="${b._mx}" y2="${b._my}" class="map-edge" data-edge="${c.to}"/>`;
+  }
+  stations.forEach((st, i) => {
+    const isDock = i === game.station;
+    const isDest = game.offers.some((c) => c.to === i);
+    const cls = isDock ? "dock" : isDest ? "dest" : "node";
+    const r = isDock ? 2.4 : isDest ? 2.0 : 1.3;
+    out += `<circle cx="${st._mx}" cy="${st._my}" r="${r}" class="map-node ${cls}" data-i="${i}"/>`;
+    const nm = st.name.replace(/ (Station|Anchorage|Depot|Yards|Relay|Port|Hub|Gate)$/, "");
+    out += `<text x="${st._mx + 3}" y="${st._my + 1}" class="map-label ${cls}">${nm}</text>`;
+  });
+  svg.innerHTML = out;
+}
+
+function selectMapNode(i) {
+  mapSelected = i;
+  buildStarMap();
+  // highlight selection
+  const node = el("map-svg").querySelector(`.map-node[data-i="${i}"]`);
+  if (node) node.classList.add("sel");
+  const edge = el("map-svg").querySelector(`.map-edge[data-edge="${i}"]`);
+  if (edge) edge.classList.add("sel");
+
+  const box = el("map-detail");
+  if (i === game.station) {
+    box.innerHTML = `<div class="name">${stations[i].name}</div><span class="dim">You are docked here.</span>`;
+    return;
+  }
+  const b = mapBeta, g = lorentz(b);
+  const d = stations[game.station].pos.distanceTo(stations[i].pos);
+  const uni = d / b, aged = d / (b * g), dv = 2 * rapidity(b);
+  const fuelOk = dv <= game.fuel;
+  const c = game.offers.find((o) => o.to === i);
+
+  let html = `<div class="name">${stations[i].name}</div>`;
+  html += `<span class="k">distance</span> ${d.toFixed(0)} ly &nbsp;·&nbsp; ` +
+          `<span class="k">Δv</span> <span class="${fuelOk ? "" : "bad"}">${dv.toFixed(1)}</span> / ${game.fuel.toFixed(1)}<br/>`;
+  html += `at <b>${b}c</b>: <span class="k">universe</span> ${fmtY(uni)} &nbsp;·&nbsp; ` +
+          `<span class="k">you age</span> <b>${aged.toFixed(2)} yr</b><br/>`;
+  if (c) {
+    const need = c.type === "cargo"
+      ? `deadline ${fmtY(c.deadline)} — need ≥ ${Math.min(0.99, c.d / c.deadline).toFixed(2)}c`
+      : `age cap ${c.maxAging.toFixed(1)} yr — need γ ≥ ${(c.d / c.maxAging).toFixed(1)}`;
+    const meets = c.type === "cargo" ? uni <= c.deadline : aged <= c.maxAging;
+    html += `<span class="k">${c.type === "cargo" ? "FREIGHT" : "PASSAGE"}</span> ${c.what} · ` +
+            `<span class="gold-t">₡${c.pay}</span> · ${c.gLimit}g<br/>` +
+            `<span class="${meets ? "good" : "bad"}">${meets ? "✓ meets" : "✗ misses"}</span> ${need}` +
+            ` <button class="btn ${meets ? "gold" : ""}" id="map-accept" style="margin-left:8px;padding:5px 12px">ACCEPT</button>`;
+  } else {
+    html += `<span class="dim">no contract to this station</span>`;
+  }
+  box.innerHTML = html;
+
+  const acc = el("map-accept");
+  if (acc) acc.addEventListener("click", () => {
+    if (acc.dataset.armed) { closeMap(); depart(c); }
+    else { acc.dataset.armed = "1"; acc.textContent = "CONFIRM"; acc.classList.add("armed"); }
+  });
+}
+
+el("st-map").addEventListener("click", openMap);
+el("map-back").addEventListener("click", closeMap);
+el("map-svg").addEventListener("click", (e) => {
+  const t = e.target.closest(".map-node");
+  if (t) selectMapNode(+t.dataset.i);
+});
+el("map-speeds").addEventListener("click", (e) => {
+  const btn = e.target.closest(".mapspd");
+  if (!btn) return;
+  mapBeta = parseFloat(btn.dataset.b);
+  el("map-speeds").querySelectorAll(".mapspd").forEach((b) => b.classList.toggle("active", b === btn));
+  if (mapSelected >= 0) selectMapNode(mapSelected);
+});
 
 function depart(c) {
   game.contract = { ...c, acceptCoord: ship.coordTime, acceptShip: ship.shipTime };

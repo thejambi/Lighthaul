@@ -44,6 +44,12 @@ forfeits the contract and costs years of your life.
 Between runs you refuel (credits per rapidity unit) and pick from three
 procedurally generated contracts. Retire rich, not old.
 
+**Star chart** (the ★ button at a dock) is a trip planner: a top-down map of the
+cluster with your open contracts as gold routes. Pick a cruise speed and tap any
+station to see that leg's real cost — distance, Δv (vs. your tank), universe-time,
+and the ship-years you'd age — with a live ✓/✗ on whether that speed meets the
+contract's deadline or γ requirement. Accept a run straight from the map.
+
 ## Controls
 
 | Input | Action |

@@ -182,6 +182,30 @@
   .offer .sub b.frag { color: var(--warn); }
   .offer .warn-need { color: var(--warn); }
 
+  /* star map */
+  #map-speeds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .mapspd { pointer-events: auto; cursor: pointer; font: inherit; font-size: 12px;
+    color: var(--hud-dim); background: rgba(143,233,255,.05); border: 1px solid rgba(143,233,255,.25);
+    border-radius: 5px; padding: 5px 10px; }
+  .mapspd.active { color: #fff; background: rgba(143,233,255,.2); border-color: rgba(143,233,255,.6); }
+  #map-svg { width: 100%; height: 46vh; max-height: 380px; display: block;
+    background: radial-gradient(ellipse at center, rgba(10,24,34,.5), rgba(2,8,14,.5));
+    border: 1px solid rgba(143,233,255,.18); border-radius: 8px; pointer-events: auto; }
+  .map-edge { stroke: rgba(255,215,106,.35); stroke-width: .4; }
+  .map-edge.sel { stroke: var(--gold); stroke-width: .7; }
+  .map-node { pointer-events: auto; cursor: pointer; stroke: rgba(0,0,0,.6); stroke-width: .3; }
+  .map-node.node { fill: #8fb8c8; }
+  .map-node.dest { fill: var(--gold); }
+  .map-node.dock { fill: #fff; }
+  .map-node.sel { stroke: #fff; stroke-width: .8; }
+  .map-label { font-size: 3px; fill: var(--hud-dim); pointer-events: none; font-family: inherit; }
+  .map-label.dest { fill: var(--gold); }
+  .map-label.dock { fill: #fff; }
+  #map-detail { margin: 10px 0; font-size: 12.5px; line-height: 1.7; min-height: 66px; color: var(--hud); }
+  #map-detail .dim { color: var(--hud-dim); }
+  #map-detail .k { color: var(--hud-dim); }
+  #map-detail .name { color: #fff; font-size: 14px; }
+
   .good { color: var(--ok); } .bad { color: var(--warn); } .gold-t { color: var(--gold); }
   .go { margin-top: 14px; color: var(--hud); font-size: 14px; animation: pulse 1.6s infinite; }
 
@@ -247,11 +271,31 @@
       <div class="stat-line" id="st-stats"></div>
       <div id="st-offers"></div>
       <div style="margin-top:14px">
+        <button class="btn" id="st-map">★ STAR CHART</button>
         <button class="btn gold" id="st-refuel">REFUEL</button>
         <button class="btn" id="st-retire">RETIRE NOW</button>
       </div>
       <p style="margin-top:12px; font-size:11px">Accepting a contract undocks you aimed at the destination.
          Cut throttle in time — you dock below <b>0.20c</b> within <b>15 ly</b>. The <b>TOW</b> button (or <b>R</b>) recovers you if you're stranded.</p>
+    </div>
+  </div>
+
+  <!-- STAR MAP -->
+  <div id="starmap" class="screen hiddenS">
+    <div class="card" style="max-width:720px">
+      <h2 id="map-title">Star Chart</h2>
+      <div class="stat-line" style="margin:4px 0 10px">Plan a leg — pick a cruise speed, then tap a station.
+        Gold routes are your open contracts.</div>
+      <div id="map-speeds">
+        <button class="mapspd" data-b="0.5">0.5c</button>
+        <button class="mapspd" data-b="0.9">0.9c</button>
+        <button class="mapspd" data-b="0.99">0.99c</button>
+        <button class="mapspd active" data-b="0.999">0.999c</button>
+        <button class="mapspd" data-b="0.9999">0.9999c</button>
+      </div>
+      <svg id="map-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="map-detail"><span class="dim">Tap a station to plan the leg.</span></div>
+      <button class="btn" id="map-back">◂ BACK TO DOCK</button>
     </div>
   </div>
 

@@ -18,22 +18,28 @@ You're a courier pilot. Accept a contract, undock aimed at the destination,
 burn, cruise, brake, dock. The tension is a genuine special-relativity triangle:
 
 - **Fuel is Δv, measured in rapidity** (`φ = atanh β`) — the real proper delta-v
-  of an ideal rocket. Reaching 0.99c costs φ≈2.65; 0.9999c costs φ≈4.95 — and
-  you pay it **again to brake**. Fuel costs diverge as you push toward *c*.
-- **Cargo deadlines run on universe time** (`d/β` to cover distance `d`), so slow
-  cruising misses them. Any decent speed beats the clock — speed is about *time*,
-  not γ.
+  of an ideal rocket. Reaching 0.99c costs φ≈2.65; 0.9999c costs φ≈4.95 — and you
+  pay it **again to brake**. The tank is deliberately small, so you *can't* max
+  every leg — fly only as fast as the job actually needs.
+- **Cargo deadlines run on universe time** (`d/β`), so slow cruising misses them.
 - **Passengers age on ship time** (`d/(βγ)`), so their aging caps force **high γ**
   — the twin paradox as a contract clause.
-- **You age on ship time too**, and retire at 68. A cheap, slow 100 ly haul at
-  0.6c costs you ~14 years of life; the same run at 0.9999c costs ~1.4 years but
-  ~10 rapidity units of fuel. Fly cheap and die old, or fly hot and pay for it.
+- **You age on ship time too**, and retire at 68 — every year aboard is a year off
+  your career.
+- **Inertial rating (the G-limit).** Your **inertial dampers** cancel the brutal
+  *proper* acceleration of relativistic cruising, so what the load actually feels
+  is the residual *maneuvering* load — how **hard you burn and brake**, not how
+  fast you go. Every contract has a G-rating (fragile passengers ~3–8 g, cargo up
+  to ~18 g); exceed it and you drain the shipment's **integrity**, which cuts your
+  pay on arrival. So a gentle ramp to 0.9999c is safe but *slow to build* (eating
+  your deadline), while a turbo slam is fast but wrecks fragile freight. Fragile +
+  tight-deadline contracts pay a premium precisely because you can't have both.
 
 Dock by arriving within **15 ly** below **0.20c** (the HUD warns you when you're
-inside braking distance — cut throttle in time!). Run the tank dry and you're on
-a **dead stick** — coasting at whatever β you had, unable to brake — and your
-only option is an expensive tow (**R**) that forfeits the contract and costs
-years of your life.
+inside braking distance — cut throttle in time, and *gently* if the cargo's
+fragile). Run the tank dry and you're on a **dead stick** — coasting at whatever β
+you had, unable to brake — and your only option is an expensive tow (**R**) that
+forfeits the contract and costs years of your life.
 
 Between runs you refuel (credits per rapidity unit) and pick from three
 procedurally generated contracts. Retire rich, not old.

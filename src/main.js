@@ -43,10 +43,12 @@ composer.addPass(new OutputPass());
 // ---------------------------------------------------------------------------
 const START_AGE = 28;
 const RETIRE_AGE = 68;
-const TANK = 26;              // Δv budget in rapidity units
-const FUEL_PRICE = 12;        // credits per rapidity unit
-const DOCK_RADIUS = 15;       // ly
+const TANK = 14;             // Δv budget in rapidity units (scarce — can't max every leg)
+const FUEL_PRICE = 20;       // credits per rapidity unit
+const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
+const LOAD_K = 9;           // maneuvering accel -> felt inertial load (g)
+const DMG_RATE = 0.10;      // integrity lost per (g over rating) per second
 
 const game = {
   phase: "title",             // title | station | flight | results | over
@@ -59,6 +61,7 @@ const game = {
   station: 0,
   offers: [],
   contract: null,
+  integrity: 1,               // cargo/passenger condition on the current run (0..1)
   lastResult: null,
 };
 
@@ -289,22 +292,26 @@ function makeContracts(fromIdx) {
     if (used.has(t)) continue;
     used.add(t);
     const d = stations[fromIdx].pos.distanceTo(stations[t].pos);
+    // inertial rating: max maneuvering G the load tolerates. Lower = more
+    // fragile = must burn/brake gently = a demand premium on the pay.
     if (Math.random() < 0.55) {
       // cargo: universe-time deadline — requires a minimum average speed
       const betaReq = 0.55 + Math.random() * 0.4;
+      const gLimit = Math.round(4 + Math.random() * 14);        // 4–18 g
       offers.push({
-        type: "cargo", what: _pick(CARGO), to: t, d,
+        type: "cargo", what: _pick(CARGO), to: t, d, gLimit,
         deadline: d / betaReq + 4,
-        pay: Math.round(90 + d * (0.9 + (betaReq - 0.5) * 3.2)),
+        pay: Math.round((90 + d * (0.9 + (betaReq - 0.5) * 3.2)) * (1 + Math.max(0, 11 - gLimit) * 0.05)),
       });
     } else {
       // passenger: ship-time aging cap — requires a minimum average gamma
       const gReq = 4 + Math.random() * 26;
+      const gLimit = Math.round(3 + Math.random() * 5);          // 3–8 g (humans)
       offers.push({
-        type: "passenger", what: _pick(PAX), to: t, d,
+        type: "passenger", what: _pick(PAX), to: t, d, gLimit,
         deadline: d / 0.7 + 8,
         maxAging: d / gReq * 1.15 + 0.6,
-        pay: Math.round(160 + d * (0.7 + gReq * 0.14)),
+        pay: Math.round((160 + d * (0.7 + gReq * 0.14)) * (1 + Math.max(0, 8 - gLimit) * 0.06)),
       });
     }
   }
@@ -357,11 +364,13 @@ function buildStation() {
     const need = c.type === "cargo"
       ? `needs ≥ <b>${Math.min(0.99, c.d / c.deadline).toFixed(2)}c</b> average`
       : `keep average γ ≥ <b>${(c.d / c.maxAging).toFixed(1)}</b> (they may age ≤ ${c.maxAging.toFixed(1)} yr)`;
+    const frag = c.gLimit <= 6 ? ` · <b class="frag">fragile: ${c.gLimit}g rating</b>`
+                               : ` · rugged: ${c.gLimit}g rating`;
     div.innerHTML =
       `<div class="t">${c.type === "cargo" ? "FREIGHT — " + c.what : "PASSAGE — " + c.what}` +
       `<span class="pay">₡${c.pay}</span></div>` +
       `<div class="sub">to <b>${stations[c.to].name}</b> · ${c.d.toFixed(0)} ly · ` +
-      `deadline ${fmtY(c.deadline)} (universe) · ${need}</div>` +
+      `deadline ${fmtY(c.deadline)} (universe) · ${need}${frag}</div>` +
       `<button class="btn" data-i="${i}">ACCEPT & UNDOCK</button>`;
     const btn = div.querySelector("button");
     btn.addEventListener("click", () => {
@@ -397,11 +406,13 @@ el("st-retire").addEventListener("click", () => setPhase("over"));
 
 function depart(c) {
   game.contract = { ...c, acceptCoord: ship.coordTime, acceptShip: ship.shipTime };
+  game.integrity = 1;
   ship.pos.copy(stations[game.station].pos);
   ship.throttle = 0;
   ship.beta = 0;
   dyn.prevBeta = 0;
   dyn.prevPhi = 0;
+  dyn.load = 0;
   // undock aimed at the destination
   _dir.copy(stations[c.to].pos).sub(ship.pos).normalize();
   ship.quat.setFromUnitVectors(new THREE.Vector3(0, 0, -1), _dir);
@@ -425,6 +436,13 @@ function dock() {
   if (c.type === "passenger" && usedShip > c.maxAging) {
     ok = false; pay = Math.round(pay * 0.2);
     notes.push(`passenger aged ${usedShip.toFixed(1)} yr — limit was ${c.maxAging.toFixed(1)} yr (pay docked 80%)`);
+  }
+  // inertial damage: exceeding the rating stressed the load
+  if (game.integrity < 0.995) {
+    pay = Math.round(pay * (0.4 + 0.6 * game.integrity)); // floor at 40% even if wrecked
+    const pct = Math.round((1 - game.integrity) * 100);
+    notes.push(`${c.type === "passenger" ? "passengers roughed up" : "cargo stressed"} — ${pct}% over-rating damage (pay cut)`);
+    if (game.integrity < 0.6) ok = false;
   }
   game.credits += pay;
   game.earned += pay;
@@ -634,6 +652,7 @@ const hud = {
   throttleFill: el("throttleFill"), throttlePct: el("throttlePct"),
   cDest: el("c-dest"), cDist: el("c-dist"), cDeadline: el("c-deadline"),
   cAging: el("c-aging"), cPay: el("c-pay"), cStatus: el("c-status"),
+  cRating: el("c-rating"), cInteg: el("c-integrity"), integFill: el("integFill"), integBar: el("integBar"),
   fxAberr: el("fx-aberr"), fxDoppler: el("fx-doppler"), fxBeam: el("fx-beam"),
   fxContract: el("fx-contract"), fxCmb: el("fx-cmb"),
 };
@@ -658,7 +677,7 @@ function fmt(n, d = 1) {
 }
 
 const view = { lookYaw: 0 };
-const dyn = { prevBeta: 0, prevPhi: 0, gForce: 0, shake: 0, fovKick: 0, veil: 0 };
+const dyn = { prevBeta: 0, prevPhi: 0, load: 0, shake: 0, fovKick: 0, veil: 0 };
 
 // ---------------------------------------------------------------------------
 // Main loop
@@ -755,17 +774,21 @@ function update(dt) {
   cmbUniforms.uGamma.value = gamma;
   cmbUniforms.uGain.value = fx.cmb ? 0.5 : 0;
 
-  // --- felt G (linear γ³·dv/dt + centripetal γ²·v·ω) ---
+  // --- inertial load (the dampers cancel the diverging PROPER accel of cruising;
+  // this is the residual maneuvering load the crew/cargo actually feel — how hard
+  // you're burning/braking plus a little turning). Bounded, unlike the raw γ³ term.
   const coordAccel = (ship.beta - dyn.prevBeta) / Math.max(dt, 1e-4);
   dyn.prevBeta = ship.beta;
-  const properAccel = coordAccel * Math.pow(gamma, 3);
-  const turnProper = gamma * gamma * ship.beta * omegaTurn;
-  const properTotal = Math.hypot(properAccel, turnProper);
+  const loadTarget = Math.abs(coordAccel) * LOAD_K +
+                     THREE.MathUtils.clamp(omegaTurn * ship.beta * 5, 0, 10);
+  dyn.load += (loadTarget - dyn.load) * Math.min(1, dt * 5);
+
+  // exceed the contract's inertial rating and you damage the load
+  const overG = dyn.load - game.contract.gLimit;
+  if (overG > 0) game.integrity = Math.max(0, game.integrity - overG * DMG_RATE * dt);
+
   const surge = THREE.MathUtils.clamp(Math.abs(coordAccel) / 2.2, 0, 1);
-  const turnSurge = THREE.MathUtils.clamp(turnProper / 22, 0, 1);
-  const feltSurge = Math.max(surge, turnSurge);
-  const targetG = Math.min(99, properTotal * 1.6);
-  dyn.gForce += (targetG - dyn.gForce) * Math.min(1, dt * 6);
+  const feltSurge = Math.max(surge, THREE.MathUtils.clamp(dyn.load / 22, 0, 1));
   const targetShake = Math.min(0.016, feltSurge * 0.012 + ship.beta * ship.beta * 0.0012);
   dyn.shake += (targetShake - dyn.shake) * Math.min(1, dt * 8);
   const targetKick = THREE.MathUtils.clamp(coordAccel * 4.0, -6, 8);
@@ -810,8 +833,9 @@ function updateHUD(gamma, dist, coordRate) {
   hud.pct.textContent = (pctC >= 99.99 ? fmt(pctC, 4) : fmt(pctC, 3)) + " %c";
   hud.beta.textContent = ship.beta.toFixed(ship.beta > 0.999 ? 7 : 6);
   hud.gamma.textContent = gamma > 1000 ? gamma.toExponential(2) : fmt(gamma, 4);
-  hud.gforce.textContent = (dyn.gForce >= 99 ? "99+" : fmt(dyn.gForce, 1)) + " g";
-  hud.gforce.style.color = dyn.gForce > 9 ? "var(--warn)" : "var(--hud)";
+  const over = dyn.load > game.contract.gLimit;
+  hud.gforce.textContent = fmt(dyn.load, 1) + " / " + game.contract.gLimit + " g";
+  hud.gforce.style.color = over ? "var(--warn)" : dyn.load > game.contract.gLimit * 0.8 ? "var(--gold)" : "var(--hud)";
   hud.age.textContent = game.pilotAge.toFixed(1) + " yr";
   hud.credits.textContent = "₡" + game.credits;
   hud.fuel.textContent = game.fuel.toFixed(1) + " / " + TANK;
@@ -832,13 +856,22 @@ function updateHUD(gamma, dist, coordRate) {
     hud.cAging.textContent = aged.toFixed(2) + " / " + c.maxAging.toFixed(1) + " yr";
     hud.cAging.className = "v" + (aged > c.maxAging * 0.8 ? " bad" : "");
   }
+  hud.cRating.textContent = c.gLimit + " g";
+  const integPct = Math.round(game.integrity * 100);
+  hud.cInteg.textContent = integPct + "%";
+  hud.cInteg.className = "v" + (game.integrity < 0.6 ? " bad" : "");
+  hud.integFill.style.width = integPct + "%";
+  hud.integBar.classList.toggle("hurt", game.integrity < 0.6);
   hud.cPay.textContent = "₡" + c.pay;
 
   // status line: braking guidance & docking
   const lyPerSec = ship.beta * coordRate;              // current ly per real second
   const brakeDist = lyPerSec * 1.5 + 4;                 // rough easing-stop estimate
   let status = "", cls = "";
-  if (dist < DOCK_RADIUS) {
+  if (dyn.load > c.gLimit) {
+    status = "⚠ OVER INERTIAL RATING — ease off";
+    cls = "brake";
+  } else if (dist < DOCK_RADIUS) {
     status = ship.beta < DOCK_BETA ? "DOCKING…" : "IN RANGE — slow below 0.20c";
     cls = "dockable";
   } else if (dist < brakeDist) {

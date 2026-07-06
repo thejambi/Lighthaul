@@ -65,6 +65,11 @@
   #contract .row .v { color: var(--hud); font-variant-numeric: tabular-nums; }
   #contract .row .v.pay { color: var(--gold); }
   #contract .row .v.bad { color: var(--warn); }
+  #integBar { position: relative; height: 8px; border: 1px solid rgba(143,233,255,.3); border-radius: 4px;
+    overflow: hidden; background: rgba(0,0,0,.4); margin: 4px 0 2px; }
+  #integFill { position: absolute; inset: 0; right: auto; width: 100%;
+    background: linear-gradient(90deg, #1b6f8a, #5fe6ff); transition: width .1s linear; }
+  #integBar.hurt #integFill { background: linear-gradient(90deg, #7a1b1b, #ff6a5a); }
   #contract .status { margin-top: 6px; font-size: 11px; letter-spacing: 1px; text-align: center; min-height: 14px; }
   #contract .status.brake { color: var(--warn); animation: pulse 0.7s infinite; }
   #contract .status.dockable { color: var(--ok); }
@@ -164,6 +169,7 @@
   .offer .t .pay { color: var(--gold); float: right; }
   .offer .sub { color: var(--hud-dim); font-size: 12px; line-height: 1.7; }
   .offer .sub b { color: var(--hud); }
+  .offer .sub b.frag { color: var(--warn); }
   .offer .warn-need { color: var(--warn); }
 
   .good { color: var(--ok); } .bad { color: var(--warn); } .gold-t { color: var(--gold); }
@@ -216,10 +222,9 @@
       <h1>LIGHTHAUL</h1>
       <p style="margin-top:2px; letter-spacing:2px; color:var(--hud)">A RELATIVISTIC COURIER GAME</p>
       <p>Haul cargo and passengers between stations at a hair under light speed.
-         <b>Fuel is Δv</b> — it diverges as you push toward <i>c</i>, and you must budget the braking burn.
-         <b>Deadlines run on universe time</b>, so fly fast on average.
-         <b>Passengers age on ship time</b>, so keep γ high to keep them young.
-         And <b>so do you</b> — every year aboard is a year off your career. Retire rich, not old.</p>
+         <b>Fuel is Δv</b> — it diverges toward <i>c</i>, the tank is small, and you pay again to brake, so fly only as fast as the job needs.
+         <b>Deadlines run on universe time</b> · <b>passengers age on ship time</b> (keep γ high) · <b>and so do you</b> — retire rich, not old.
+         Your <b>inertial dampers</b> cancel the brutal G of cruising, but hard burns and hard braking still stress the load — respect each contract's <b>inertial rating</b> or arrive with damaged goods.</p>
       <div class="go" id="title-go">▶ click or press any key to report for duty</div>
     </div>
   </div>
@@ -263,7 +268,7 @@
       <div class="row big"><span class="k">SPEED</span><span class="v" id="s-pct">0.000 %c</span></div>
       <div class="row"><span class="k">β (v/c)</span><span class="v" id="s-beta">0.000000</span></div>
       <div class="row"><span class="k">γ Lorentz</span><span class="v" id="s-gamma">1.0000</span></div>
-      <div class="row"><span class="k">thrust</span><span class="v" id="s-gforce">0.0 g</span></div>
+      <div class="row"><span class="k">inertial load</span><span class="v" id="s-gforce">0.0 g</span></div>
       <hr/>
       <div class="row"><span class="k">pilot age</span><span class="v" id="s-age">28.0 yr</span></div>
       <div class="row"><span class="k">credits</span><span class="v" id="s-credits">₡0</span></div>
@@ -277,6 +282,9 @@
       <div class="row"><span class="k">distance</span><span class="v" id="c-dist">—</span></div>
       <div class="row"><span class="k">deadline (universe)</span><span class="v" id="c-deadline">—</span></div>
       <div class="row" id="c-age-row" style="display:none"><span class="k">passenger aged</span><span class="v" id="c-aging">—</span></div>
+      <div class="row"><span class="k">inertial rating</span><span class="v" id="c-rating">—</span></div>
+      <div class="row"><span class="k">integrity</span><span class="v" id="c-integrity">100%</span></div>
+      <div id="integBar"><div id="integFill"></div></div>
       <div class="row"><span class="k">payment</span><span class="v pay" id="c-pay">—</span></div>
       <div class="status" id="c-status"></div>
     </div>

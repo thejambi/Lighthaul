@@ -321,7 +321,9 @@ function setPhase(p) {
   game.phase = p;
   for (const [k, s] of Object.entries(screens)) s.classList.toggle("hiddenS", k !== p);
   document.body.classList.toggle("flight", p === "flight");
-  if (p === "station") buildStation();
+  // generate the three contracts once, on arrival — not on every re-render
+  // (so refuelling doesn't re-roll the offers)
+  if (p === "station") { game.offers = makeContracts(game.station); buildStation(); }
   if (p === "results") buildResults();
   if (p === "over") buildGameOver();
   markDirty();
@@ -347,7 +349,6 @@ function buildStation() {
     ` &nbsp;·&nbsp; Δv <b>${game.fuel.toFixed(1)}</b> / ${TANK}` +
     ` &nbsp;·&nbsp; deliveries <b>${game.deliveries}</b>`;
 
-  game.offers = makeContracts(game.station);
   const box = el("st-offers");
   box.innerHTML = "";
   game.offers.forEach((c, i) => {

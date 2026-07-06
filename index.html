@@ -137,6 +137,13 @@
     background: radial-gradient(ellipse 70% 70% at center,
       rgba(0,0,0,0) 35%, rgba(20,0,0,.55) 72%, rgba(0,0,0,.95) 100%); }
   #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 5; }
+  /* easter-egg docking-assist badge (shown on all screens when active) */
+  #autoBadge { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 40;
+    display: none; padding: 4px 12px; font-size: 11px; letter-spacing: 2px; color: var(--ok);
+    background: rgba(8,24,16,.85); border: 1px solid rgba(141,255,158,.5); border-radius: 20px;
+    text-shadow: 0 0 8px rgba(141,255,158,.6); pointer-events: none; }
+  #autoBadge.on { display: block; }
+  #autoBadge.flash { animation: pulse .5s 3; }
 
   /* ---------- full-screen game screens ---------- */
   .screen {
@@ -388,6 +395,7 @@
 
   <div id="gveil"></div>
   <div id="flash"></div>
+  <div id="autoBadge">◈ DOCKING ASSIST</div>
 
   <script type="importmap">
   {

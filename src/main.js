@@ -47,6 +47,7 @@ const TANK = 14;             // Δv budget in rapidity units (scarce — can't m
 const FUEL_PRICE = 20;       // credits per rapidity unit
 const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
+const AP_SLOW = 130;        // ly over which the autopilot bleeds off speed to dock
 const LOAD_K = 9;           // maneuvering accel -> felt inertial load (g)
 const DMG_RATE = 0.10;      // integrity lost per (g over rating) per second
 
@@ -631,6 +632,7 @@ const keys = new Set();
 const input = { yaw: 0, pitch: 0, roll: 0 };
 let uiHidden = false;
 let started = false;
+let autopilotAssist = false;   // easter-egg "docking assist" — auto-cuts throttle to dock
 
 const audio = createAudio();
 
@@ -659,6 +661,25 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Digit5") fx.cmb ^= 1;
 });
 window.addEventListener("keyup", (e) => keys.delete(e.code));
+
+// --- easter egg: the Konami code toggles the docking assist (a hand for new
+// pilots — it auto-cuts the throttle so you always dock cleanly). ↑↑↓↓←→←→ B A
+const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
+                "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "KeyB", "KeyA"];
+let konamiIdx = 0;
+window.addEventListener("keydown", (e) => {
+  konamiIdx = e.code === KONAMI[konamiIdx] ? konamiIdx + 1 : (e.code === KONAMI[0] ? 1 : 0);
+  if (konamiIdx === KONAMI.length) {
+    konamiIdx = 0;
+    autopilotAssist = !autopilotAssist;
+    updateAutopilotIndicator(true);
+  }
+});
+function updateAutopilotIndicator(doFlash) {
+  const b = el("autoBadge");
+  b.classList.toggle("on", autopilotAssist);
+  if (doFlash) { b.classList.remove("flash"); void b.offsetWidth; b.classList.add("flash"); }
+}
 
 // drag steering (mouse + touch)
 let dragging = false, dragId = null, lastX = 0, lastY = 0;
@@ -873,6 +894,20 @@ function update(dt) {
   shipForward(_fwd);
   const omegaTurn = Math.acos(THREE.MathUtils.clamp(_prevFwd.dot(_fwd), -1, 1)) / Math.max(dt, 1e-4);
 
+  // --- autopilot docking assist (easter egg): as you close on the target, cap
+  // the throttle so speed bleeds off smoothly and you arrive slow enough to dock.
+  if (autopilotAssist && game.fuel > 0) {
+    const apTgt = stations[game.contract.to];
+    const apDist = apTgt.pos.distanceTo(ship.pos);
+    _dir.copy(apTgt.pos).sub(ship.pos).normalize();
+    if (_fwd.dot(_dir) > 0.2 && apDist < AP_SLOW + DOCK_RADIUS) {
+      // desired β reaches ~0 only well inside the dock radius, so the ship keeps
+      // drifting in slowly (below dock speed) rather than halting short of it
+      const desired = THREE.MathUtils.clamp((apDist - DOCK_RADIUS * 0.4) / AP_SLOW, 0, 1);
+      ship.throttle = Math.min(ship.throttle, betaToThrottle(desired));
+    }
+  }
+
   // --- speed easing + FUEL: burn |Δrapidity| (proper Δv of the maneuver) ---
   const targetBeta = throttleToBeta(ship.throttle);
   ship.beta += (targetBeta - ship.beta) * Math.min(1, dt * 2.5);
@@ -1020,6 +1055,9 @@ function updateHUD(gamma, dist, coordRate) {
   } else if (bearing < 0) {
     status = "⚠ TARGET ASTERN — turn back to the marker";
     cls = "brake";
+  } else if (autopilotAssist && bearing > 0.2 && dist < AP_SLOW + DOCK_RADIUS) {
+    status = "◈ AUTOPILOT DOCKING…";
+    cls = "dockable";
   } else if (dist < brakeDist) {
     status = "⚠ CUT THROTTLE — braking distance";
     cls = "brake";

@@ -79,10 +79,21 @@ add linearly near *c*; rapidities do), and all three clocks — deadline (univer
 time), passenger aging and pilot aging (ship time) — fall out of the same
 `t_ship = t_universe/γ` bookkeeping.
 
-Liberties: stations are magically at rest with respect to each other, docking is
-instant, time freezes while docked, the "tow" is pure gameplay, and the starfield
-geography is compressed fiction (see the engine README for the full honesty
-list).
+### What's compressed (and what isn't)
+
+The **time-dilation itself is exact**: a leg of distance `d` flown at β ages you
+`d/(βγ)` ship-years, so higher γ really does keep you (and your passengers)
+younger — the twin paradox, straight. What's *not* to scale is the **world**: a
+40-something-year working life is pitted against a compact ~60–350 ly cluster.
+Real interstellar distances (thousands of ly) against a human lifespan would be
+unplayable — one 0.9c hop would age you centuries — so the cluster is shrunk and
+the career stretched (retire at 82, framed as a rejuvenation-era certification)
+until a career is a satisfying *string* of deliveries rather than two doomed
+voyages. The **dilation ratio is real; the absolute scale is a game dial.**
+
+Other liberties: stations are at rest relative to each other, docking is instant,
+time freezes while docked, the "tow" is pure gameplay, and the geography is
+procedural fiction (see the engine README for the full honesty list).
 
 ## Layout
 

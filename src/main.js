@@ -14,7 +14,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {
-  C_CAP, lorentz, aberrateDir,
+  C_CAP, lorentz,
   STAR_VERT, STAR_FRAG, GALAXY_VERT, GALAXY_FRAG, CMB_VERT, CMB_FRAG,
 } from "./relativity.js";
 import { makeGalaxyAtlas } from "./textures.js";
@@ -894,6 +894,9 @@ function updateHUD(gamma, dist, coordRate) {
   // status line: braking guidance & docking
   const lyPerSec = ship.beta * coordRate;              // current ly per real second
   const brakeDist = lyPerSec * 1.5 + 4;                 // rough easing-stop estimate
+  // bearing to the destination: +1 = dead ahead, <0 = behind your nose
+  _dir.copy(stations[c.to].pos).sub(ship.pos).normalize();
+  const bearing = shipForward(_ab).dot(_dir);
   let status = "", cls = "";
   if (dyn.load > c.gLimit) {
     status = "⚠ OVER INERTIAL RATING — ease off";
@@ -901,6 +904,9 @@ function updateHUD(gamma, dist, coordRate) {
   } else if (dist < DOCK_RADIUS) {
     status = ship.beta < DOCK_BETA ? "DOCKING…" : "IN RANGE — slow below 0.20c";
     cls = "dockable";
+  } else if (bearing < 0) {
+    status = "⚠ TARGET ASTERN — turn back to the marker";
+    cls = "brake";
   } else if (dist < brakeDist) {
     status = "⚠ CUT THROTTLE — braking distance";
     cls = "brake";
@@ -926,14 +932,13 @@ function updateLabels() {
     // the target label stays visible at any speed; others fade near c
     const fade = isTarget ? 1 : labelFade;
     if (fade <= 0.001) { st.el.style.display = "none"; continue; }
-    _dir.copy(st.pos).sub(ship.pos);
-    const dist = _dir.length();
+    const dist = st.pos.distanceTo(ship.pos);
     if (dist < 1e-3) { st.el.style.display = "none"; continue; }
-    _dir.multiplyScalar(1 / dist);
-    const beta = fx.aberration ? ship.beta : 0;
-    aberrateDir(_dir, _fwd, beta, _ab);
-    _proj.copy(ship.pos).addScaledVector(_ab, dist);
-    _proj.project(camera);
+    // Project the TRUE station position (not aberrated). A nav marker should read
+    // as an honest bearing: it swings to the edge and off-screen as you fly past,
+    // instead of aberration pinning it to the forward cone so you can't tell you
+    // overshot.
+    _proj.copy(st.pos).project(camera);
     // hide behind-camera and near-edge labels so no clipped text hugs the edges
     // (x is tighter because the labels are wide horizontal text)
     if (_proj.z > 1 || _proj.z < -1 ||

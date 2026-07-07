@@ -1368,17 +1368,14 @@ function update(dt) {
   if (launching) ship.throttle = 0;                             // stay put until GO
 
   // --- assisted aim: the autopilot holds the contract target; a tapped marker
-  // slews the ship onto it. Both defer the instant you steer manually.
+  // locks onto it the same way. Both hold the target dead-centre until you steer
+  // manually (which clears the lock up in the steering block).
   const aimGoal = (autopilotAssist && game.contract) ? stations[game.contract.to].pos : (aimStation && aimStation.pos);
   if (aimGoal && !manualSteer) {
     // launch aim is quick; a deliberate tap is snappier than the autopilot's gentle hold
     const aimRate = launching ? AIM_RATE : (autopilotAssist ? AIM_RATE * 0.5 : AIM_RATE * 1.3);
     aimAtPos(aimGoal, dt, aimRate * agility);
     shipForward(_fwd);                    // refresh heading after the assist turned us
-    if (aimStation) {                     // clear a one-shot tap-aim once we're on it
-      _dir.copy(aimStation.pos).sub(ship.pos).normalize();
-      if (shipForward(_ab).dot(_dir) > 0.9995) aimStation = null;
-    }
   }
 
   // --- autopilot docking assist (easter egg): behaves exactly like holding the

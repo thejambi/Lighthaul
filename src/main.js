@@ -1117,12 +1117,14 @@ window.addEventListener("pointerup", (e) => {
   dragging = false; dragId = null;
   if (game.phase === "flight" && Math.hypot(e.clientX - downX, e.clientY - downY) < 6) {
     const i = stationAtScreen(e.clientX, e.clientY, 70);   // tapped a marker? aim at it
-    if (i >= 0) aimStation = stations[i];
+    // a tap's stray pixel or two of movement must NOT count as steering, or it
+    // would cancel the aim next frame — drop the pending drag so the slew holds.
+    if (i >= 0) { aimStation = stations[i]; dragYaw = dragPitch = 0; }
   }
 });
 // the off-screen target arrow is a tap target too: aim at the destination
 el("targetArrow").addEventListener("click", () => {
-  if (game.phase === "flight" && game.contract) aimStation = stations[game.contract.to];
+  if (game.phase === "flight" && game.contract) { aimStation = stations[game.contract.to]; dragYaw = dragPitch = 0; }
 });
 
 // throttle bar drag
@@ -1339,7 +1341,7 @@ function update(dt) {
   const desYaw   = (kYaw * KEY_TURN + dragYaw / Math.max(dt, 1e-4)) * agility;   // rad/s
   const desPitch = (dragPitch / Math.max(dt, 1e-4)) * agility;
   dragYaw = 0; dragPitch = 0;
-  const manualSteer = kYaw !== 0 || kRoll !== 0 || desYaw !== 0 || desPitch !== 0;
+  const manualSteer = kYaw !== 0 || kRoll !== 0 || Math.abs(desYaw) > 1e-3 || Math.abs(desPitch) > 1e-3;
   const resp = Math.min(1, dt * STEER_RESP * agility);
   av.yaw   += (desYaw   - av.yaw)   * resp;
   av.pitch += (desPitch - av.pitch) * resp;

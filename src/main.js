@@ -83,13 +83,13 @@ const CLASSES = {
   },
   hauler: {
     name: "Hauler", tag: "BULK CARGO",
-    tank: 20, fuelEff: 0.9, damper: 1.2, handling: 0.7, credits: 320,
+    tank: 20, fuelEff: 1.12, damper: 1.2, handling: 0.7, credits: 320,
     pips: { tank: 5, fuel: 2, handling: 1, care: 2 },
     blurb: "A big-tank freighter for long, fast rugged-cargo runs. Turns like a moon and feels every G — keep fragile passengers off it.",
   },
   interceptor: {
     name: "Interceptor", tag: "HIGH SKILL",
-    tank: 10, fuelEff: 1.25, damper: 1.15, handling: 1.45, credits: 300,
+    tank: 10, fuelEff: 0.8, damper: 1.15, handling: 1.45, credits: 300,
     pips: { tank: 1, fuel: 5, handling: 5, care: 2 },
     blurb: "A featherweight racer: sips fuel, turns on a spark, flies high-γ passenger work cheap. Tiny tank, thin hull — precise hands only.",
   },

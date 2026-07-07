@@ -782,7 +782,7 @@ function buildShipStats() {
       "per Δv" + (u.drive ? ` · drive −${u.drive * 12}%` : ""), q(fuelFactor(), true)) +
     row("felt load", mult(loadFactor()),
       "maneuvering G" + (u.damper ? ` · dampers −${u.damper * 15}%` : ""), q(loadFactor(), true)) +
-    row("handling", mult(c.handling), "turn rate", q(c.handling, false)) +
+    row("handling", mult(c.handling), "turn & throttle response", q(c.handling, false)) +
     row("contract pay", "×" + payMult().toFixed(2),
       u.broker ? `broker +${u.broker * 8}%` : "no broker license", q(payMult(), false)) +
     row("retires at", retireAge().toFixed(0),
@@ -1318,12 +1318,14 @@ function frame(now) {
 }
 
 function update(dt) {
-  // --- throttle keys (fine default, Shift turbo) ---
+  // --- throttle keys (fine default, Shift turbo). Per-ship responsiveness: nimble
+  // hulls spin the drive up/down fast, heavy hulls are sluggish (shares handling).
   const turbo = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 4 : 1;
-  const rate = 0.14 * turbo;
+  const thr = shipCls().handling;
+  const rate = 0.14 * turbo * thr;
   if (keys.has("KeyW") || keys.has("ArrowUp")) ship.throttle += rate * dt;
   if (keys.has("KeyS") || keys.has("ArrowDown")) ship.throttle -= rate * dt;
-  if (touchThrottleRate) ship.throttle += touchThrottleRate * dt; // held thrust-bar zone
+  if (touchThrottleRate) ship.throttle += touchThrottleRate * thr * dt; // held thrust-bar zone
   if (keys.has("Space")) ship.throttle = 0;
   ship.throttle = Math.max(0, Math.min(1, ship.throttle));
 

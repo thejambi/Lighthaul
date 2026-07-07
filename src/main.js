@@ -51,6 +51,8 @@ const LOW_FUEL = 6;          // Δv below which the dock nags you to refuel (see
 const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
 const AP_DECEL = 0.14;      // autopilot throttle-down rate = the S-key rate
+const PREFLIGHT = 5;        // seconds after undock: clock frozen, aim at the target, then GO
+const AIM_RATE = 2.2;       // autopilot slerp rate onto the target heading (per second)
 const LOAD_K = 9;           // maneuvering accel -> felt inertial load (g)
 const DMG_RATE = 0.10;      // integrity lost per (g over rating) per second
 
@@ -106,6 +108,7 @@ const game = {
   offers: [],
   contract: null,
   integrity: 1,               // cargo/passenger condition on the current run (0..1)
+  preflight: 0,               // seconds left in the frozen pre-launch/aim window
   upgrades: { tank: 0, drive: 0, damper: 0, broker: 0, rejuv: 0, autopilot: 0 },
   lastResult: null,
 };
@@ -715,9 +718,14 @@ function depart(c) {
   dyn.prevPhi = 0;
   dyn.load = 0;
   apBraking = false;
-  // undock aimed at the destination
+  game.preflight = PREFLIGHT;            // frozen window to find & aim at the target
+  // undock facing OFF the target by ~60–100° (mostly yaw) — you aim during the
+  // countdown, or the autopilot slerps you on. Never a hopeless 180.
   _dir.copy(stations[c.to].pos).sub(ship.pos).normalize();
-  ship.quat.setFromUnitVectors(new THREE.Vector3(0, 0, -1), _dir);
+  ship.quat.setFromUnitVectors(_FWD, _dir);
+  const offAng = (60 + Math.random() * 40) * Math.PI / 180 * (Math.random() < 0.5 ? 1 : -1);
+  _q.setFromAxisAngle(_up.set((Math.random() - 0.5) * 0.5, 1, (Math.random() - 0.5) * 0.5).normalize(), offAng);
+  ship.quat.multiply(_q);
   el("c-dest").textContent = stations[c.to].name;
   el("c-age-row").style.display = c.type === "passenger" ? "flex" : "none";
   updateBadges();
@@ -1096,6 +1104,7 @@ const hud = {
   cRating: el("c-rating"), cInteg: el("c-integrity"), integFill: el("integFill"), integBar: el("integBar"),
   fxAberr: el("fx-aberr"), fxDoppler: el("fx-doppler"), fxBeam: el("fx-beam"),
   fxContract: el("fx-contract"), fxCmb: el("fx-cmb"),
+  countdown: el("countdown"), targetArrow: el("targetArrow"),
 };
 const flashEl = el("flash");
 const gveilEl = el("gveil");
@@ -1111,8 +1120,22 @@ const _dir = new THREE.Vector3();
 const _ab = new THREE.Vector3();
 const _proj = new THREE.Vector3();
 const _q = new THREE.Quaternion();
+const _FWD = new THREE.Vector3(0, 0, -1);   // ship's nose in local space (never mutated)
+const _UP = new THREE.Vector3(0, 1, 0);
+const _ZERO = new THREE.Vector3(0, 0, 0);
+const _m4 = new THREE.Matrix4();
+const _aimQuat = new THREE.Quaternion();
 
 function shipForward(out) { return out.set(0, 0, -1).applyQuaternion(ship.quat); }
+
+// Smoothly rotate the ship so its nose points at the contract target (used by the
+// autopilot during the launch window and to hold alignment in flight).
+function aimAtTarget(dt, rate) {
+  _dir.copy(stations[game.contract.to].pos).sub(ship.pos).normalize();
+  _m4.lookAt(_ZERO, _dir, _UP);           // orientation whose −z faces the target
+  _aimQuat.setFromRotationMatrix(_m4);
+  ship.quat.slerp(_aimQuat, Math.min(1, dt * rate));
+}
 function fmt(n, d = 1) {
   return n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
 }
@@ -1175,11 +1198,25 @@ function update(dt) {
   shipForward(_fwd);
   const omegaTurn = Math.acos(THREE.MathUtils.clamp(_prevFwd.dot(_fwd), -1, 1)) / Math.max(dt, 1e-4);
 
+  // --- pre-launch window: clock & aging frozen, ship at rest, throttle inert.
+  // You spend it finding and aiming at the target; at GO the timer starts.
+  const launching = game.preflight > 0;
+  if (launching) {
+    game.preflight = Math.max(0, game.preflight - dt);
+    ship.throttle = 0;
+    if (game.preflight === 0) showToast("GO — clock running");   // fires once, on the GO frame
+  }
+  // autopilot keeps the nose on the target — strong during the aim, gentle after
+  if (autopilotAssist && game.contract) {
+    aimAtTarget(dt, launching ? AIM_RATE : AIM_RATE * 0.4);
+    shipForward(_fwd);                    // refresh heading after the assist turned us
+  }
+
   // --- autopilot docking assist (easter egg): behaves exactly like holding the
   // S key — a steady throttle-down at the normal rate — kicked off at the precise
   // distance where that brings you to dock speed right at the 15 ly mark. The
   // start point is found by forward-simulating the hold-S trajectory.
-  if (autopilotAssist && game.fuel > 0) {
+  if (autopilotAssist && game.fuel > 0 && !launching) {
     const apTgt = stations[game.contract.to];
     const apDist = apTgt.pos.distanceTo(ship.pos);
     _dir.copy(apTgt.pos).sub(ship.pos).normalize();
@@ -1205,21 +1242,23 @@ function update(dt) {
   dyn.prevPhi = phi;
   if (dphi > 0) game.fuel = Math.max(0, game.fuel - dphi * fuelFactor());
 
-  // --- pilot-frame pacing: universe time & distance scale with γ (capped) ---
-  const gPace = GAMMA_CAP * Math.tanh(gamma / GAMMA_CAP);
-  const dCoord = PROPER_RATE * gPace * dt;
-  const ds = ship.beta * dCoord;
-  ship.pos.addScaledVector(_fwd, ds);
-  ship.coordTime += dCoord;
-  const dShip = dCoord / gamma;
-  ship.shipTime += dShip;
-  game.pilotAge += dShip;
-
-  // --- arrival check ---
+  // --- pilot-frame pacing: universe time & distance scale with γ (capped).
+  // Frozen during the launch window (no motion, no clocks, no aging).
   const c = game.contract;
   const tgt = stations[c.to];
+  let dCoord = 0;
+  if (!launching) {
+    const gPace = GAMMA_CAP * Math.tanh(gamma / GAMMA_CAP);
+    dCoord = PROPER_RATE * gPace * dt;
+    const ds = ship.beta * dCoord;
+    ship.pos.addScaledVector(_fwd, ds);
+    ship.coordTime += dCoord;
+    const dShip = dCoord / gamma;
+    ship.shipTime += dShip;
+    game.pilotAge += dShip;
+  }
   const dist = tgt.pos.distanceTo(ship.pos);
-  if (dist < DOCK_RADIUS && ship.beta < DOCK_BETA) { dock(); return; }
+  if (!launching && dist < DOCK_RADIUS && ship.beta < DOCK_BETA) { dock(); return; }
 
   // --- push uniforms ---
   for (const layer of layers) {
@@ -1281,6 +1320,7 @@ function update(dt) {
 
   updateHUD(gamma, dist, dCoord / Math.max(dt, 1e-4));
   updateLabels();
+  updateTargetArrow();
   audio.update(ship.beta, ship.throttle, 0, feltSurge);
 
   gveilEl.style.opacity = dyn.veil.toFixed(3);
@@ -1335,7 +1375,10 @@ function updateHUD(gamma, dist, coordRate) {
   _dir.copy(stations[c.to].pos).sub(ship.pos).normalize();
   const bearing = shipForward(_ab).dot(_dir);
   let status = "", cls = "";
-  if (dyn.load > c.gLimit) {
+  if (game.preflight > 0) {
+    status = bearing > 0.985 ? "◈ ON TARGET — hold" : "◷ AIM AT THE MARKER";
+    cls = "dockable";
+  } else if (dyn.load > c.gLimit) {
     status = "⚠ OVER INERTIAL RATING — ease off";
     cls = "brake";
   } else if (dist < DOCK_RADIUS) {
@@ -1356,6 +1399,15 @@ function updateHUD(gamma, dist, coordRate) {
   }
   hud.cStatus.textContent = status;
   hud.cStatus.className = "status " + cls;
+
+  // pre-launch countdown overlay
+  if (game.preflight > 0) {
+    hud.countdown.style.display = "block";
+    hud.countdown.innerHTML = `<div class="cd-num">${Math.ceil(game.preflight)}</div>` +
+      `<div class="cd-hint">AIM AT ${stations[c.to].name}</div>`;
+  } else if (hud.countdown.style.display !== "none") {
+    hud.countdown.style.display = "none";
+  }
 
   hud.fxAberr.className = fx.aberration ? "on" : "";
   hud.fxDoppler.className = fx.doppler ? "on" : "";
@@ -1394,6 +1446,30 @@ function updateLabels() {
     st.el.classList.toggle("target", !!isTarget);
     st.dEl.textContent = dist.toFixed(0) + " ly";
   }
+}
+
+// Edge arrow pointing to the contract target whenever it's off-screen (during the
+// launch aim, and after an overshoot). Hidden when the target is on-screen — its
+// own label marks it then.
+function updateTargetArrow() {
+  const arrow = hud.targetArrow;
+  const c = game.contract;
+  if (!c) { arrow.style.display = "none"; return; }
+  _proj.copy(stations[c.to].pos).project(camera);
+  let x = _proj.x, y = _proj.y;
+  const behind = _proj.z > 1;
+  if (behind) { x = -x; y = -y; }          // point toward it even when it's behind us
+  if (!behind && Math.abs(x) <= 0.94 && Math.abs(y) <= 0.94) { arrow.style.display = "none"; return; }
+  const len = Math.hypot(x, y) || 1;
+  const nx = x / len, ny = y / len;
+  const s = 0.9 / Math.max(Math.abs(nx), Math.abs(ny));   // push out to a screen-edge rect
+  const px = (nx * s * 0.5 + 0.5) * window.innerWidth;
+  const py = (-ny * s * 0.5 + 0.5) * window.innerHeight;
+  const ang = Math.atan2(-ny, nx) * 180 / Math.PI;        // screen-space angle (y flipped)
+  arrow.style.display = "block";
+  arrow.style.left = px + "px";
+  arrow.style.top = py + "px";
+  arrow.style.transform = `translate(-50%,-50%) rotate(${ang}deg)`;
 }
 
 // ---------------------------------------------------------------------------

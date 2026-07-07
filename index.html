@@ -144,6 +144,16 @@
     font-size: 12px; letter-spacing: 3px; color: var(--warn); opacity: 0;
     text-shadow: 0 0 10px rgba(255,106,90,.6); transition: opacity .2s; }
   #viewmode.on { opacity: .9; }
+
+  /* pre-launch countdown + off-screen target arrow */
+  #countdown { position: absolute; top: 24%; left: 50%; transform: translateX(-50%); z-index: 6;
+    text-align: center; pointer-events: none; display: none; }
+  #countdown .cd-num { font-size: 64px; line-height: 1; font-weight: bold; color: #fff;
+    letter-spacing: 2px; text-shadow: 0 0 26px rgba(143,233,255,.75); }
+  #countdown .cd-hint { margin-top: 6px; font-size: 12px; letter-spacing: 3px; color: var(--gold);
+    text-shadow: 0 0 10px rgba(255,215,106,.6); }
+  #targetArrow { position: absolute; z-index: 5; font-size: 30px; line-height: 1; color: var(--gold);
+    pointer-events: none; display: none; text-shadow: 0 0 12px rgba(255,215,106,.8); }
   @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
 
   #gveil { position: fixed; inset: 0; pointer-events: none; z-index: 4; opacity: 0;
@@ -455,6 +465,8 @@
     </div>
 
     <div id="reticle"></div>
+    <div id="targetArrow">➤</div>
+    <div id="countdown"></div>
     <div id="toast"></div>
     <div id="viewmode">◂ LOOKING ASTERN ▸</div>
 

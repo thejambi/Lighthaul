@@ -66,8 +66,36 @@ const UPGRADES = {
   autopilot: { icon: "◈", name: "Docking Assist",   desc: "auto-brakes to a clean dock", costs: [500], oneShot: true },
 };
 
+// Ship classes, chosen at career start. Each is a different trade fed into the
+// same dial getters the upgrades use, so a class just sets the baseline and
+// upgrades stack on top. A difficulty spread: the Courier is soft and forgiving,
+// the Interceptor a thin-hulled glass cannon for precise hands. `tank` is base Δv,
+// `fuelEff`/`damper`/`handling` multiply fuel burned / felt load / turn rate.
+// `pips` (1–5) are display-only ratings for the select screen.
+const CLASSES = {
+  courier: {
+    name: "Courier", tag: "FORGIVING",
+    tank: 14, fuelEff: 1.0, damper: 0.85, handling: 1.0, credits: 450,
+    pips: { tank: 3, fuel: 3, handling: 3, care: 5 },
+    blurb: "Balanced and gentle on the load — quick to point, hard to wreck. The pilot's-first-ship all-rounder.",
+  },
+  hauler: {
+    name: "Hauler", tag: "BULK CARGO",
+    tank: 20, fuelEff: 0.9, damper: 1.2, handling: 0.7, credits: 320,
+    pips: { tank: 5, fuel: 2, handling: 1, care: 2 },
+    blurb: "A big-tank freighter for long, fast rugged-cargo runs. Turns like a moon and feels every G — keep fragile passengers off it.",
+  },
+  interceptor: {
+    name: "Interceptor", tag: "HIGH SKILL",
+    tank: 10, fuelEff: 1.25, damper: 1.15, handling: 1.45, credits: 300,
+    pips: { tank: 1, fuel: 5, handling: 5, care: 2 },
+    blurb: "A featherweight racer: sips fuel, turns on a spark, flies high-γ passenger work cheap. Tiny tank, thin hull — precise hands only.",
+  },
+};
+
 const game = {
-  phase: "title",             // title | station | flight | results | over
+  phase: "title",             // title | select | station | flight | results | over
+  cls: "courier",             // chosen ship class (default until the select screen)
   credits: 400,
   fuel: TANK,
   pilotAge: START_AGE,
@@ -157,10 +185,11 @@ function apBrakeDistance(beta0) {
 // --- upgrade effects: each derived dial folds in the owned level. Kept as live
 // getters (not baked constants) so buying mid-career takes effect immediately.
 const UP_KEYS = Object.keys(UPGRADES);
-function tankCap()   { return TANK + game.upgrades.tank * 3; }          // Δv capacity
-function retireAge() { return RETIRE_AGE + game.upgrades.rejuv * 6; }   // career length
-function loadFactor(){ return 1 - game.upgrades.damper * 0.15; }        // felt maneuvering load ×
-function fuelFactor(){ return 1 - game.upgrades.drive * 0.12; }         // fuel burned ×
+function shipCls()   { return CLASSES[game.cls]; }                                    // active ship class
+function tankCap()   { return shipCls().tank + game.upgrades.tank * 3; }              // Δv capacity
+function retireAge() { return RETIRE_AGE + game.upgrades.rejuv * 6; }                 // career length (pilot, not ship)
+function loadFactor(){ return shipCls().damper * (1 - game.upgrades.damper * 0.15); } // felt maneuvering load ×
+function fuelFactor(){ return shipCls().fuelEff * (1 - game.upgrades.drive * 0.12); } // fuel burned ×
 function payMult()   { return 1 + game.upgrades.broker * 0.08; }        // contract pay ×
 function contractPay(c) { return Math.round(c.pay * payMult()); }
 
@@ -426,7 +455,7 @@ function makeContracts(fromIdx) {
 const el = (id) => document.getElementById(id);
 // #starmap is listed so setPhase hides it on any real transition; it's never a
 // phase itself — it's opened as an overlay on the station screen.
-const screens = { title: el("title"), station: el("station"), results: el("results"), over: el("gameover"), map: el("starmap") };
+const screens = { title: el("title"), select: el("select"), station: el("station"), results: el("results"), over: el("gameover"), map: el("starmap") };
 
 function setPhase(p) {
   game.phase = p;
@@ -784,7 +813,7 @@ function buildGameOver() {
   el("go-title").textContent = forced ? "Mandatory retirement" : "Retired";
   el("go-body").innerHTML =
     `<div class="rank">rank earned · <b class="gold-t">${rankFor(game.credits)}</b></div>` +
-    `You hung up the flight suit at <b>${game.pilotAge.toFixed(1)}</b>.<br/>` +
+    `You hung up the flight suit at <b>${game.pilotAge.toFixed(1)}</b>, flying the <b>${shipCls().name}</b>.<br/>` +
     `While you flew, the universe aged <b>${fmtY(ship.coordTime)}</b> — ` +
     `you lived <b>${fmtY(ship.shipTime)}</b> of it aboard.<br/>` +
     `Deliveries <b class="good">${game.deliveries}</b>${star(beat.deliveries)} · ` +
@@ -827,9 +856,41 @@ function start() {
   try { window.focus(); } catch (_) {}
   audio.init();
   updateSoundIndicator();
-  setPhase("station");
+  setPhase("select");           // choose a ship before the first contract
 }
 el("title").addEventListener("click", start);
+
+// ship-class picker (shown once, at the top of a career)
+function buildClassSelect() {
+  const box = el("class-list");
+  if (!box) return;
+  const pipBar = (n) => { let s = ""; for (let i = 0; i < 5; i++) s += `<span class="pip ${i < n ? "on" : ""}"></span>`; return s; };
+  const stat = (lab, n) => `<div class="cc-stat"><span class="cc-lab">${lab}</span><span class="pips">${pipBar(n)}</span></div>`;
+  box.innerHTML = "";
+  for (const [key, c] of Object.entries(CLASSES)) {
+    const div = document.createElement("div");
+    div.className = "classcard";
+    div.innerHTML =
+      `<div class="cc-head"><span class="cc-name">${c.name}</span><span class="cc-tag">${c.tag}</span></div>` +
+      stat("Δv tank", c.pips.tank) + stat("fuel economy", c.pips.fuel) +
+      stat("handling", c.pips.handling) + stat("cargo care", c.pips.care) +
+      `<div class="cc-stat"><span class="cc-lab">start credits</span><span class="cc-credits gold-t">₡${c.credits}</span></div>` +
+      `<div class="cc-blurb">${c.blurb}</div>` +
+      `<button class="btn gold" data-cls="${key}">FLY THE ${c.name.toUpperCase()}</button>`;
+    box.appendChild(div);
+  }
+  box.querySelectorAll("button[data-cls]").forEach((b) =>
+    b.addEventListener("click", () => applyClass(b.dataset.cls)));
+}
+
+function applyClass(key) {
+  game.cls = key;
+  const c = CLASSES[key];
+  game.credits = c.credits;
+  game.fuel = c.tank;           // start with a full tank of the class's size
+  setPhase("station");
+}
+buildClassSelect();
 window.addEventListener("keydown", (e) => {
   if (game.phase === "title") { start(); return; }
   if (game.phase !== "flight") return;
@@ -1100,7 +1161,7 @@ function update(dt) {
   input.roll += kRoll * 0.6 * dt;
 
   shipForward(_prevFwd);
-  const turnScale = 1 / (1 + (lorentz(ship.beta) - 1) * 0.6);
+  const turnScale = shipCls().handling / (1 + (lorentz(ship.beta) - 1) * 0.6);
   _q.setFromAxisAngle(_up.set(0, 1, 0), input.yaw * turnScale);
   ship.quat.multiply(_q);
   _q.setFromAxisAngle(_right.set(1, 0, 0), input.pitch * turnScale);

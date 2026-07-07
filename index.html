@@ -207,6 +207,21 @@
   .lowfuel b { color: #fff; }
   .btn.urge { animation: pulse 1s infinite; }
 
+  /* ship-class select */
+  #class-list { display: flex; flex-wrap: wrap; gap: 12px; }
+  .classcard { flex: 1 1 210px; min-width: 200px; border: 1px solid rgba(143,233,255,.22); border-radius: 10px;
+    padding: 14px 15px; background: rgba(0,0,0,.28); display: flex; flex-direction: column; }
+  .classcard:hover { border-color: rgba(143,233,255,.5); background: rgba(8,20,28,.5); }
+  .cc-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .cc-name { font-size: 17px; color: #fff; letter-spacing: .5px; }
+  .cc-tag { font-size: 9px; letter-spacing: 1.5px; color: var(--gold); border: 1px solid rgba(255,215,106,.4);
+    border-radius: 10px; padding: 2px 7px; white-space: nowrap; flex: none; }
+  .cc-stat { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 3px 0; font-size: 11px; }
+  .cc-lab { color: var(--hud-dim); }
+  .cc-credits { font-size: 13px; }
+  .cc-blurb { margin: 11px 0 13px; font-size: 11.5px; line-height: 1.6; color: var(--hud-dim); flex: 1; }
+  .classcard .btn { margin: 0; text-align: center; }
+
   /* outfitting shop */
   #st-shop { margin-top: 16px; }
   .shop-hd { font-size: 11px; letter-spacing: 1.5px; color: var(--hud-dim); margin-bottom: 6px;
@@ -320,6 +335,16 @@
          Your <b>inertial dampers</b> cancel the brutal G of cruising, but hard burns and hard braking still stress the load — respect each contract's <b>inertial rating</b> or arrive with damaged goods.</p>
       <div id="title-records" class="title-records" style="display:none"></div>
       <div class="go" id="title-go">▶ click or press any key to report for duty</div>
+    </div>
+  </div>
+
+  <!-- SHIP SELECT -->
+  <div id="select" class="screen hiddenS">
+    <div class="card" style="max-width:760px">
+      <h2>Choose your ship</h2>
+      <div class="stat-line" style="margin:4px 0 14px">Each hull is a different trade — and you fly the whole career in it.
+        You can patch a weakness with upgrades later, but the ship you pick shapes how you'll haul.</div>
+      <div id="class-list"></div>
     </div>
   </div>
 

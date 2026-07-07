@@ -57,6 +57,18 @@ contract), a **Rejuv Course** (+years before mandatory retirement — buy more
 career), and a **Docking Assist** that auto-brakes you to a clean dock. Levels
 persist across the career and show as badges on the flight HUD.
 
+**Ship classes.** Each career opens with a choice of hull, and you fly the whole
+run in it — the forgiving all-round **Courier**, the big-tank rugged-cargo
+**Hauler** (turns like a moon, feels every G — keep fragile passengers off it),
+or the featherweight high-skill **Interceptor** (sips fuel, turns on a spark,
+flies high-γ passenger work cheap, but a tiny tank and thin hull). Each is a
+different trade in Δv capacity, fuel economy, handling, and how much punishment
+the load takes; upgrades stack on top, so you patch a weakness over a career.
+
+**Records & rank.** Retire and you earn a rank on your final balance — from
+*Deadhead* to *Lightspeed Legend* — and your best careers (richest retirement,
+most deliveries) persist as records to beat on your next run.
+
 **Star chart** (the ★ button at a dock) is a trip planner: a top-down map of the
 cluster with your open contracts as gold routes. Pick a cruise speed and tap any
 station to see that leg's real cost — distance, Δv (vs. your tank), universe-time,

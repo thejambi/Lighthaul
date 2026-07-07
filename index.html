@@ -129,12 +129,20 @@
   #effects .snd { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(143,233,255,.15); color: var(--hud-dim); }
   #effects .snd b { color: var(--hud); }
 
-  .landmark { position: absolute; transform: translate(-50%,-50%); font-size: 11px; color: #bfefff;
-    text-shadow: 0 0 6px rgba(0,0,0,.9); white-space: nowrap; pointer-events: none; }
-  .landmark .dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:#bfefff; margin-right:5px; vertical-align: middle; box-shadow: 0 0 6px #bfefff; }
-  .landmark .d { color: var(--hud-dim); font-size:10px; margin-left:6px; }
-  .landmark.target { color: var(--gold); }
+  /* the DOT sits exactly on the station's projected point (the aim point); the
+     name/distance float to the side so they never cover it */
+  .landmark { position: absolute; pointer-events: none; }
+  .landmark .dot { position: absolute; left: 0; top: 0; transform: translate(-50%,-50%);
+    width: 6px; height: 6px; border-radius: 50%; background: #bfefff; box-shadow: 0 0 6px #bfefff; }
+  .landmark .tag { position: absolute; left: 11px; top: 0; transform: translateY(-50%);
+    white-space: nowrap; font-size: 11px; color: #bfefff; text-shadow: 0 0 6px rgba(0,0,0,.9); }
+  .landmark .d { color: var(--hud-dim); font-size: 10px; margin-left: 6px; }
+  .landmark.target .tag { color: var(--gold); }
   .landmark.target .dot { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+  /* the target aim dot gets a thin reticle ring so it reads as "point here" */
+  .landmark.target .dot::after { content: ""; position: absolute; left: 50%; top: 50%;
+    width: 16px; height: 16px; transform: translate(-50%,-50%); border-radius: 50%;
+    border: 1px solid rgba(255,215,106,.55); }
 
   #toast { position: absolute; top: calc(50% - 60px); left: 50%; transform: translateX(-50%); z-index: 4;
     font-size: 20px; letter-spacing: 2px; color: #fff; opacity: 0; transition: opacity .25s;

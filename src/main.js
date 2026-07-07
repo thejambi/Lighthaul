@@ -398,7 +398,7 @@ const labelsRoot = document.getElementById("labels");
 for (const st of stations) {
   const el = document.createElement("div");
   el.className = "landmark";
-  el.innerHTML = `<span class="dot"></span><span class="nm"></span><span class="d"></span>`;
+  el.innerHTML = `<span class="dot"></span><span class="tag"><span class="nm"></span><span class="d"></span></span>`;
   el.querySelector(".nm").textContent = st.name;
   labelsRoot.appendChild(el);
   st.el = el;

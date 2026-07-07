@@ -1,0 +1,52 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="lh-bg" cx="50%" cy="43%" r="72%">
+      <stop offset="0%" stop-color="#0c2536"/>
+      <stop offset="55%" stop-color="#051220"/>
+      <stop offset="100%" stop-color="#01040b"/>
+    </radialGradient>
+    <radialGradient id="lh-ray" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="6%" stop-color="#ffffff"/>
+      <stop offset="30%" stop-color="#bff2ff"/>
+      <stop offset="58%" stop-color="#7fe0ff"/>
+      <stop offset="82%" stop-color="#ffcf5e"/>
+      <stop offset="100%" stop-color="#ff9a45" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lh-core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#cbf5ff"/>
+      <stop offset="100%" stop-color="#7fe3ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- deep-space tile -->
+  <rect x="1.5" y="1.5" width="61" height="61" rx="15" fill="url(#lh-bg)"/>
+
+  <!-- aberrated star rays streaking out from the core -->
+  <g stroke="url(#lh-ray)" stroke-linecap="round" fill="none">
+    <g stroke-width="2.6">
+      <line x1="32" y1="32" x2="32" y2="6.5"/>
+      <line x1="32" y1="32" x2="32" y2="6.5" transform="rotate(45 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="6.5" transform="rotate(90 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="6.5" transform="rotate(135 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="6.5" transform="rotate(180 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="6.5" transform="rotate(225 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="6.5" transform="rotate(270 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="6.5" transform="rotate(315 32 32)"/>
+    </g>
+    <g stroke-width="1.7">
+      <line x1="32" y1="32" x2="32" y2="14" transform="rotate(22.5 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="14" transform="rotate(67.5 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="14" transform="rotate(112.5 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="14" transform="rotate(157.5 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="14" transform="rotate(202.5 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="14" transform="rotate(247.5 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="14" transform="rotate(292.5 32 32)"/>
+      <line x1="32" y1="32" x2="32" y2="14" transform="rotate(337.5 32 32)"/>
+    </g>
+  </g>
+
+  <!-- white-hot core -->
+  <circle cx="32" cy="32" r="11" fill="url(#lh-core)"/>
+  <circle cx="32" cy="32" r="2.9" fill="#ffffff"/>
+</svg>

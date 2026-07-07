@@ -53,6 +53,10 @@ const DOCK_BETA = 0.2;
 const AP_DECEL = 0.14;      // autopilot throttle-down rate = the S-key rate
 const PREFLIGHT = 10;       // seconds after undock: clock frozen, aim at the target (or thrust to launch early)
 const AIM_RATE = 2.2;       // autopilot slerp rate onto the target heading (per second)
+const DRAG_SENS = 0.004;    // radians of turn per pixel dragged (before ship handling)
+const KEY_TURN = 1.3;       // yaw rad/s for a held A/D key (before ship handling)
+const ROLL_TURN = 1.6;      // roll rad/s for a held Q/E key
+const STEER_RESP = 32;      // how fast the turn eases to the input — ×handling (crisp vs. inertial)
 const LOAD_K = 9;           // maneuvering accel -> felt inertial load (g)
 const DMG_RATE = 0.10;      // integrity lost per (g over rating) per second
 
@@ -798,6 +802,7 @@ function depart(c) {
   dyn.prevPhi = 0;
   dyn.load = 0;
   apBraking = false;
+  av.yaw = av.pitch = av.roll = 0; dragYaw = dragPitch = 0; aimStation = null;   // clean steering
   game.preflight = PREFLIGHT;            // frozen window to find & aim at the target
   // undock facing OFF the target by ~60–100° (mostly yaw) — you aim during the
   // countdown, or the autopilot slerps you on. Never a hopeless 180.
@@ -930,7 +935,9 @@ updateTitleRecords();
 // Input
 // ---------------------------------------------------------------------------
 const keys = new Set();
-const input = { yaw: 0, pitch: 0, roll: 0 };
+const av = { yaw: 0, pitch: 0, roll: 0 };   // smoothed angular velocity (rad/s)
+let dragYaw = 0, dragPitch = 0;             // this-frame drag deltas, consumed each frame
+let aimStation = null;                      // tapped/assisted aim target (a station) or null
 let uiHidden = false;
 let started = false;
 let autopilotAssist = false;   // easter-egg "docking assist" — auto-cuts throttle to dock
@@ -1051,22 +1058,32 @@ el("st-name").addEventListener("click", () => {
   if (headerTaps >= 5) { headerTaps = 0; toggleAutopilot(); }
 });
 
-// drag steering (mouse + touch)
-let dragging = false, dragId = null, lastX = 0, lastY = 0;
+// drag steering (mouse + touch). A drag pans; a tap (barely moved) on a station
+// marker slews the ship onto it (assisted aim).
+let dragging = false, dragId = null, lastX = 0, lastY = 0, downX = 0, downY = 0;
 renderer.domElement.addEventListener("pointerdown", (e) => {
   if (game.phase !== "flight") return;
   dragging = true; dragId = e.pointerId;
-  lastX = e.clientX; lastY = e.clientY;
+  lastX = downX = e.clientX; lastY = downY = e.clientY;
 });
 window.addEventListener("pointermove", (e) => {
   if (!dragging || e.pointerId !== dragId || game.phase !== "flight") return;
   const dx = e.clientX - lastX, dy = e.clientY - lastY;
   lastX = e.clientX; lastY = e.clientY;
-  input.yaw -= dx * 0.0016;
-  input.pitch -= dy * 0.0016;
+  dragYaw -= dx * DRAG_SENS;
+  dragPitch -= dy * DRAG_SENS;
 });
 window.addEventListener("pointerup", (e) => {
-  if (e.pointerId === dragId) { dragging = false; dragId = null; }
+  if (e.pointerId !== dragId) return;
+  dragging = false; dragId = null;
+  if (game.phase === "flight" && Math.hypot(e.clientX - downX, e.clientY - downY) < 6) {
+    const i = stationAtScreen(e.clientX, e.clientY, 70);   // tapped a marker? aim at it
+    if (i >= 0) aimStation = stations[i];
+  }
+});
+// the off-screen target arrow is a tap target too: aim at the destination
+el("targetArrow").addEventListener("click", () => {
+  if (game.phase === "flight" && game.contract) aimStation = stations[game.contract.to];
 });
 
 // throttle bar drag
@@ -1209,13 +1226,28 @@ const _aimQuat = new THREE.Quaternion();
 
 function shipForward(out) { return out.set(0, 0, -1).applyQuaternion(ship.quat); }
 
-// Smoothly rotate the ship so its nose points at the contract target (used by the
-// autopilot during the launch window and to hold alignment in flight).
-function aimAtTarget(dt, rate) {
-  _dir.copy(stations[game.contract.to].pos).sub(ship.pos).normalize();
-  _m4.lookAt(_ZERO, _dir, _UP);           // orientation whose −z faces the target
+// Smoothly rotate the ship so its nose points at a world position (used by the
+// autopilot and by tap-to-aim).
+function aimAtPos(pos, dt, rate) {
+  _dir.copy(pos).sub(ship.pos).normalize();
+  _m4.lookAt(_ZERO, _dir, _UP);           // orientation whose −z faces the point
   _aimQuat.setFromRotationMatrix(_m4);
   ship.quat.slerp(_aimQuat, Math.min(1, dt * rate));
+}
+
+// Which station's on-screen marker is nearest to a screen point (within radius px)?
+// Used to turn a tap into an aim target. Returns an index or -1.
+function stationAtScreen(px, py, radius) {
+  let best = -1, bestD = radius;
+  for (let i = 0; i < stations.length; i++) {
+    _proj.copy(stations[i].pos).project(camera);
+    if (_proj.z > 1) continue;             // behind the camera
+    const sx = (_proj.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-_proj.y * 0.5 + 0.5) * window.innerHeight;
+    const d = Math.hypot(sx - px, sy - py);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
 }
 function fmt(n, d = 1) {
   return n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -1257,25 +1289,30 @@ function update(dt) {
   // dead stick: out of fuel = no thrust = you coast at your current beta
   if (game.fuel <= 0) ship.throttle = betaToThrottle(ship.beta);
 
-  // --- steering (turn-rate heavy near c; roll free) ---
+  // --- steering: drag/keys set a desired turn rate; the ship eases to it at a
+  // pace set by its HANDLING — nimble hulls are crisp and precise (little coast),
+  // heavy hulls are laggy and inertial. γ still makes turning heavy near c; roll
+  // is free. Consuming the drag each frame (no accumulator) kills the old overshoot.
   const kYaw = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) -
                (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
   const kRoll = (keys.has("KeyE") ? 1 : 0) - (keys.has("KeyQ") ? 1 : 0);
-  input.yaw += kYaw * 0.4 * dt;
-  input.roll += kRoll * 0.6 * dt;
+  const agility = shipCls().handling;
+  const desYaw   = (kYaw * KEY_TURN + dragYaw / Math.max(dt, 1e-4)) * agility;   // rad/s
+  const desPitch = (dragPitch / Math.max(dt, 1e-4)) * agility;
+  dragYaw = 0; dragPitch = 0;
+  const manualSteer = kYaw !== 0 || kRoll !== 0 || desYaw !== 0 || desPitch !== 0;
+  const resp = Math.min(1, dt * STEER_RESP * agility);
+  av.yaw   += (desYaw   - av.yaw)   * resp;
+  av.pitch += (desPitch - av.pitch) * resp;
+  av.roll  += (kRoll * ROLL_TURN - av.roll) * Math.min(1, dt * 6);
+  if (manualSteer) aimStation = null;          // taking manual control cancels tap-to-aim
 
   shipForward(_prevFwd);
-  const turnScale = shipCls().handling / (1 + (lorentz(ship.beta) - 1) * 0.6);
-  _q.setFromAxisAngle(_up.set(0, 1, 0), input.yaw * turnScale);
-  ship.quat.multiply(_q);
-  _q.setFromAxisAngle(_right.set(1, 0, 0), input.pitch * turnScale);
-  ship.quat.multiply(_q);
-  _q.setFromAxisAngle(_dir.set(0, 0, -1), input.roll);
-  ship.quat.multiply(_q);
+  const turnScale = 1 / (1 + (lorentz(ship.beta) - 1) * 0.6);   // relativistic turn penalty (γ)
+  _q.setFromAxisAngle(_up.set(0, 1, 0), av.yaw * turnScale * dt);    ship.quat.multiply(_q);
+  _q.setFromAxisAngle(_right.set(1, 0, 0), av.pitch * turnScale * dt); ship.quat.multiply(_q);
+  _q.setFromAxisAngle(_dir.set(0, 0, -1), av.roll * dt);            ship.quat.multiply(_q);
   ship.quat.normalize();
-  input.yaw *= Math.pow(0.0001, dt);
-  input.pitch *= Math.pow(0.0001, dt);
-  input.roll *= Math.pow(0.0001, dt);
   shipForward(_fwd);
   const omegaTurn = Math.acos(THREE.MathUtils.clamp(_prevFwd.dot(_fwd), -1, 1)) / Math.max(dt, 1e-4);
 
@@ -1288,10 +1325,19 @@ function update(dt) {
   }
   const launching = game.preflight > 0;
   if (launching) ship.throttle = 0;                             // stay put until GO
-  // autopilot keeps the nose on the target — strong during the aim, gentle after
-  if (autopilotAssist && game.contract) {
-    aimAtTarget(dt, launching ? AIM_RATE : AIM_RATE * 0.4);
+
+  // --- assisted aim: the autopilot holds the contract target; a tapped marker
+  // slews the ship onto it. Both defer the instant you steer manually.
+  const aimGoal = autopilotAssist ? stations[game.contract.to].pos : (aimStation && aimStation.pos);
+  if (aimGoal && !manualSteer) {
+    // launch aim is quick; a deliberate tap is snappier than the autopilot's gentle hold
+    const aimRate = launching ? AIM_RATE : (autopilotAssist ? AIM_RATE * 0.5 : AIM_RATE * 1.3);
+    aimAtPos(aimGoal, dt, aimRate * agility);
     shipForward(_fwd);                    // refresh heading after the assist turned us
+    if (aimStation) {                     // clear a one-shot tap-aim once we're on it
+      _dir.copy(aimStation.pos).sub(ship.pos).normalize();
+      if (shipForward(_ab).dot(_dir) > 0.9995) aimStation = null;
+    }
   }
 
   // --- autopilot docking assist (easter egg): behaves exactly like holding the

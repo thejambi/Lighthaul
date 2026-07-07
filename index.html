@@ -167,7 +167,8 @@
     text-shadow: 0 0 10px rgba(255,215,106,.6); }
   #countdown .cd-sub { margin-top: 3px; font-size: 10px; letter-spacing: 2px; color: var(--hud-dim); }
   #targetArrow { position: absolute; z-index: 5; font-size: 30px; line-height: 1; color: var(--gold);
-    pointer-events: none; display: none; text-shadow: 0 0 12px rgba(255,215,106,.8); }
+    pointer-events: auto; cursor: pointer; display: none; text-shadow: 0 0 12px rgba(255,215,106,.8);
+    padding: 6px; }
   @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
 
   #gveil { position: fixed; inset: 0; pointer-events: none; z-index: 4; opacity: 0;
@@ -526,7 +527,7 @@
 
     <div id="help" class="panel">
       <div class="title">FLIGHT CONTROLS</div>
-      <b>Mouse</b> steer (drag) · <b>W/S</b> throttle ± · <b>Q/E</b> roll · <b>Shift</b> turbo<br/>
+      <b>Mouse</b> steer (drag) · <b>tap</b> a marker to auto-aim · <b>W/S</b> throttle ± · <b>Q/E</b> roll · <b>Shift</b> turbo<br/>
       <b>Space</b> cut thrust · <b>V</b> speed presets · <b>B</b> (hold) look astern<br/>
       <b>R</b> call tow · <b>M</b> mute · <b>H</b> hide UI · <b>1–5</b> toggle effects
     </div>

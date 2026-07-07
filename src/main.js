@@ -51,7 +51,7 @@ const LOW_FUEL = 6;          // Δv below which the dock nags you to refuel (see
 const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
 const AP_DECEL = 0.14;      // autopilot throttle-down rate = the S-key rate
-const PREFLIGHT = 5;        // seconds after undock: clock frozen, aim at the target, then GO
+const PREFLIGHT = 10;       // seconds after undock: clock frozen, aim at the target (or thrust to launch early)
 const AIM_RATE = 2.2;       // autopilot slerp rate onto the target heading (per second)
 const LOAD_K = 9;           // maneuvering accel -> felt inertial load (g)
 const DMG_RATE = 0.10;      // integrity lost per (g over rating) per second
@@ -1198,14 +1198,15 @@ function update(dt) {
   shipForward(_fwd);
   const omegaTurn = Math.acos(THREE.MathUtils.clamp(_prevFwd.dot(_fwd), -1, 1)) / Math.max(dt, 1e-4);
 
-  // --- pre-launch window: clock & aging frozen, ship at rest, throttle inert.
-  // You spend it finding and aiming at the target; at GO the timer starts.
-  const launching = game.preflight > 0;
-  if (launching) {
-    game.preflight = Math.max(0, game.preflight - dt);
-    ship.throttle = 0;
+  // --- pre-launch window: clock & aging frozen, ship at rest. It ends on the
+  // timer OR the instant you apply thrust — a breather you can cut short.
+  if (game.preflight > 0) {
+    if (ship.throttle > 0) game.preflight = 0;                   // thrusting = launch now
+    else game.preflight = Math.max(0, game.preflight - dt);
     if (game.preflight === 0) showToast("GO — clock running");   // fires once, on the GO frame
   }
+  const launching = game.preflight > 0;
+  if (launching) ship.throttle = 0;                             // stay put until GO
   // autopilot keeps the nose on the target — strong during the aim, gentle after
   if (autopilotAssist && game.contract) {
     aimAtTarget(dt, launching ? AIM_RATE : AIM_RATE * 0.4);
@@ -1404,7 +1405,8 @@ function updateHUD(gamma, dist, coordRate) {
   if (game.preflight > 0) {
     hud.countdown.style.display = "block";
     hud.countdown.innerHTML = `<div class="cd-num">${Math.ceil(game.preflight)}</div>` +
-      `<div class="cd-hint">AIM AT ${stations[c.to].name}</div>`;
+      `<div class="cd-hint">AIM AT ${stations[c.to].name}</div>` +
+      `<div class="cd-sub">thrust when you're ready to launch</div>`;
   } else if (hud.countdown.style.display !== "none") {
     hud.countdown.style.display = "none";
   }

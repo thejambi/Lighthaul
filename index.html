@@ -248,6 +248,20 @@
   #map-detail .k { color: var(--hud-dim); }
   #map-detail .name { color: #fff; font-size: 14px; }
 
+  /* retirement rank + records */
+  .rank { font-size: 15px; letter-spacing: 1px; color: var(--hud-dim); margin-bottom: 12px;
+    padding-bottom: 10px; border-bottom: 1px solid rgba(143,233,255,.15); }
+  .rank b { font-size: 20px; text-shadow: 0 0 16px rgba(255,215,106,.4); }
+  .rec-new { color: var(--ok); font-size: 11px; letter-spacing: 1px; text-shadow: 0 0 8px rgba(141,255,158,.5);
+    animation: pulse 1s infinite; }
+  .alltime { margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(143,233,255,.15);
+    font-size: 12px; color: var(--hud-dim); }
+  .alltime b { color: var(--hud); }
+  .title-records { margin: 14px auto 2px; padding: 8px 14px; font-size: 12px; color: var(--hud-dim);
+    border: 1px solid rgba(143,233,255,.18); border-radius: 8px; background: rgba(0,0,0,.25); display: inline-block; }
+  .title-records .k { color: var(--hud-dim); }
+  .title-records b { color: var(--hud); }
+
   .good { color: var(--ok); } .bad { color: var(--warn); } .gold-t { color: var(--gold); }
   .go { margin-top: 14px; color: var(--hud); font-size: 14px; animation: pulse 1.6s infinite; }
 
@@ -304,6 +318,7 @@
          <b>Fuel is Δv</b> — it diverges toward <i>c</i>, the tank is small, and you pay again to brake, so fly only as fast as the job needs.
          <b>Deadlines run on universe time</b> · <b>passengers age on ship time</b> (keep γ high) · <b>and so do you</b> — retire rich, not old.
          Your <b>inertial dampers</b> cancel the brutal G of cruising, but hard burns and hard braking still stress the load — respect each contract's <b>inertial rating</b> or arrive with damaged goods.</p>
+      <div id="title-records" class="title-records" style="display:none"></div>
       <div class="go" id="title-go">▶ click or press any key to report for duty</div>
     </div>
   </div>

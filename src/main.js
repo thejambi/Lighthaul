@@ -82,6 +82,37 @@ const game = {
   lastResult: null,
 };
 
+// --- persistent records (localStorage): the one thing that outlives a career,
+// so every run is measured against your best. Rank is earned on final balance —
+// the game's whole pitch is "retire rich", and the nest egg is what you keep.
+const RECORDS_KEY = "lighthaul.records.v1";
+const RANKS = [        // final-balance thresholds → title (tune after playtesting)
+  [16000, "Lightspeed Legend"],
+  [10000, "Void Baron"],
+  [6000,  "Master Courier"],
+  [3000,  "Journeyman Courier"],
+  [1000,  "Drifter"],
+  [0,     "Deadhead"],
+];
+function rankFor(bal) { return (RANKS.find(([m]) => bal >= m) || RANKS[RANKS.length - 1])[1]; }
+const records = Object.assign(
+  { bestBalance: 0, bestEarned: 0, mostDeliveries: 0, careers: 0 },
+  (() => { try { return JSON.parse(localStorage.getItem(RECORDS_KEY)) || {}; } catch (_) { return {}; } })()
+);
+function commitCareer() {                 // fold this career into the saved bests
+  const beat = {
+    balance: game.credits > records.bestBalance,
+    earned: game.earned > records.bestEarned,
+    deliveries: game.deliveries > records.mostDeliveries,
+  };
+  records.bestBalance = Math.max(records.bestBalance, game.credits);
+  records.bestEarned = Math.max(records.bestEarned, game.earned);
+  records.mostDeliveries = Math.max(records.mostDeliveries, game.deliveries);
+  records.careers += 1;
+  try { localStorage.setItem(RECORDS_KEY, JSON.stringify(records)); } catch (_) {}
+  return beat;
+}
+
 const ship = {
   pos: new THREE.Vector3(),
   quat: new THREE.Quaternion(),
@@ -744,15 +775,39 @@ el("rs-continue").addEventListener("click", () => {
 
 function buildGameOver() {
   const forced = game.pilotAge >= retireAge();
+  // commit exactly once per career (setPhase("over") only fires on a real
+  // transition, but guard anyway so a re-render can't double-count)
+  const beat = game._recorded ? { balance: false, earned: false, deliveries: false } : commitCareer();
+  game._recorded = true;
+  updateTitleRecords();
+  const star = (on) => on ? ` <span class="rec-new">★ record</span>` : "";
   el("go-title").textContent = forced ? "Mandatory retirement" : "Retired";
   el("go-body").innerHTML =
+    `<div class="rank">rank earned · <b class="gold-t">${rankFor(game.credits)}</b></div>` +
     `You hung up the flight suit at <b>${game.pilotAge.toFixed(1)}</b>.<br/>` +
     `While you flew, the universe aged <b>${fmtY(ship.coordTime)}</b> — ` +
-    `you lived <b>${fmtY(START_AGE + ship.shipTime - START_AGE)}</b> of it aboard.<br/>` +
-    `Deliveries <b class="good">${game.deliveries}</b> · botched/towed <b class="bad">${game.failures}</b><br/>` +
-    `Career earnings <b class="gold-t">₡${game.earned}</b> · final balance <b class="gold-t">₡${game.credits}</b>`;
+    `you lived <b>${fmtY(ship.shipTime)}</b> of it aboard.<br/>` +
+    `Deliveries <b class="good">${game.deliveries}</b>${star(beat.deliveries)} · ` +
+    `botched/towed <b class="bad">${game.failures}</b><br/>` +
+    `Career earnings <b class="gold-t">₡${game.earned}</b>${star(beat.earned)} · ` +
+    `final balance <b class="gold-t">₡${game.credits}</b>${star(beat.balance)}` +
+    `<div class="alltime">— all-time —&nbsp; richest retirement <b class="gold-t">₡${records.bestBalance}</b>` +
+    ` · most deliveries <b>${records.mostDeliveries}</b> · careers flown <b>${records.careers}</b></div>`;
 }
 el("go-new").addEventListener("click", () => location.reload());
+
+// title-screen records line (hidden until you've retired at least once)
+function updateTitleRecords() {
+  const t = el("title-records");
+  if (!t) return;
+  if (!records.careers) { t.style.display = "none"; return; }
+  t.style.display = "block";
+  t.innerHTML =
+    `<span class="k">richest retirement</span> <b class="gold-t">₡${records.bestBalance}</b>` +
+    ` · <span class="k">most deliveries</span> <b>${records.mostDeliveries}</b>` +
+    ` · <span class="k">careers flown</span> <b>${records.careers}</b>`;
+}
+updateTitleRecords();
 
 // ---------------------------------------------------------------------------
 // Input

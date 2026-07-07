@@ -108,11 +108,21 @@ export function createAudio() {
     o.start(t); o.stop(t + 1.3);
   }
 
+  // ramp the continuous flight layers to silence — call when leaving flight, so
+  // the engine drone doesn't hang at its last speed/throttle on the dock screen
+  function silence() {
+    if (!started || !ctx) return;
+    const t = ctx.currentTime;
+    engineGain.gain.setTargetAtTime(0, t, 0.15);
+    subOsc._gain.gain.setTargetAtTime(0, t, 0.15);
+    noiseGain.gain.setTargetAtTime(0, t, 0.15);
+  }
+
   function setMuted(m) {
     muted = m;
     if (started && ctx) master.gain.setTargetAtTime(m ? 0 : 0.28, ctx.currentTime, 0.2);
   }
   function toggleMute() { setMuted(!muted); return muted; }
 
-  return { init, update, warpSweep, setMuted, toggleMute, isMuted: () => muted };
+  return { init, update, warpSweep, silence, setMuted, toggleMute, isMuted: () => muted };
 }

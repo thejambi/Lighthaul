@@ -95,6 +95,41 @@ const CLASSES = {
   },
 };
 
+// Stylized top-down ship silhouettes (nose up) — shown on the select cards, at
+// the dock, and on the ship-stats card. Cyan hull, gold cockpit, soft engine glow.
+const SHIP_ART = {
+  courier: `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" class="ship-svg" aria-hidden="true">
+    <ellipse cx="60" cy="102" rx="12" ry="5" fill="#8fe9ff" opacity=".22"/>
+    <ellipse cx="53" cy="101" rx="4" ry="3" fill="#eafcff" opacity=".7"/>
+    <ellipse cx="67" cy="101" rx="4" ry="3" fill="#eafcff" opacity=".7"/>
+    <path d="M60 50 L22 84 L32 90 L60 72 L88 90 L98 84 Z" fill="#4f9fbb"/>
+    <path d="M60 12 C71 32 72 66 66 98 L54 98 C48 66 49 32 60 12 Z" fill="#8fe9ff"/>
+    <ellipse cx="60" cy="40" rx="5.5" ry="10" fill="#ffd76a"/>
+    <rect x="50" y="92" width="8" height="9" rx="2.5" fill="#3f8098"/>
+    <rect x="62" y="92" width="8" height="9" rx="2.5" fill="#3f8098"/>
+  </svg>`,
+  hauler: `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" class="ship-svg" aria-hidden="true">
+    <ellipse cx="47" cy="104" rx="8" ry="5" fill="#8fe9ff" opacity=".22"/>
+    <ellipse cx="73" cy="104" rx="8" ry="5" fill="#8fe9ff" opacity=".22"/>
+    <ellipse cx="47" cy="103" rx="4" ry="3" fill="#eafcff" opacity=".7"/>
+    <ellipse cx="73" cy="103" rx="4" ry="3" fill="#eafcff" opacity=".7"/>
+    <rect x="23" y="46" width="12" height="34" rx="4" fill="#3f8098"/>
+    <rect x="85" y="46" width="12" height="34" rx="4" fill="#3f8098"/>
+    <path d="M42 22 L78 22 Q86 22 86 34 L86 96 Q86 100 82 100 L38 100 Q34 100 34 96 L34 34 Q34 22 42 22 Z" fill="#7ad3ea"/>
+    <path d="M54 12 L66 12 L72 22 L48 22 Z" fill="#8fe9ff"/>
+    <line x1="34" y1="54" x2="86" y2="54" stroke="#2c5c6e" stroke-width="2"/>
+    <line x1="34" y1="74" x2="86" y2="74" stroke="#2c5c6e" stroke-width="2"/>
+    <rect x="51" y="27" width="18" height="9" rx="3" fill="#ffd76a"/>
+  </svg>`,
+  interceptor: `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" class="ship-svg" aria-hidden="true">
+    <ellipse cx="60" cy="105" rx="9" ry="5" fill="#8fe9ff" opacity=".22"/>
+    <ellipse cx="60" cy="104" rx="4" ry="3" fill="#eafcff" opacity=".8"/>
+    <path d="M60 44 L14 99 L34 96 L60 70 L86 96 L106 99 Z" fill="#4f9fbb"/>
+    <path d="M60 8 L67 56 L64 103 L56 103 L53 56 Z" fill="#8fe9ff"/>
+    <path d="M60 22 L63 42 L57 42 Z" fill="#ffd76a"/>
+  </svg>`,
+};
+
 const game = {
   phase: "title",             // title | select | station | flight | results | over
   cls: "courier",             // chosen ship class (default until the select screen)
@@ -458,12 +493,13 @@ function makeContracts(fromIdx) {
 const el = (id) => document.getElementById(id);
 // #starmap is listed so setPhase hides it on any real transition; it's never a
 // phase itself — it's opened as an overlay on the station screen.
-const screens = { title: el("title"), select: el("select"), station: el("station"), results: el("results"), over: el("gameover"), map: el("starmap") };
+const screens = { title: el("title"), select: el("select"), station: el("station"), results: el("results"), over: el("gameover"), map: el("starmap"), ship: el("shipcard") };
 
 function setPhase(p) {
   game.phase = p;
   for (const [k, s] of Object.entries(screens)) s.classList.toggle("hiddenS", k !== p);
   document.body.classList.toggle("flight", p === "flight");
+  if (p !== "flight") audio.silence();     // don't let the engine drone hang on non-flight screens
   // generate the three contracts once, on arrival — not on every re-render
   // (so refuelling doesn't re-roll the offers)
   if (p === "station") { game.offers = makeContracts(game.station); buildStation(); }
@@ -491,6 +527,11 @@ function buildStation() {
     ` &nbsp;·&nbsp; credits <b class="gold-t">₡${game.credits}</b>` +
     ` &nbsp;·&nbsp; Δv <b>${game.fuel.toFixed(1)}</b> / ${tankCap()}` +
     ` &nbsp;·&nbsp; deliveries <b>${game.deliveries}</b>`;
+
+  el("st-ship").innerHTML =
+    `<div class="ship-mini">${SHIP_ART[game.cls]}</div>` +
+    `<div class="ship-meta"><div class="ship-nm">${shipCls().name} <span class="cc-tag">${shipCls().tag}</span></div>` +
+    `<div class="ship-sub">tap for ship stats ▸</div></div>`;
 
   const box = el("st-offers");
   box.innerHTML = "";
@@ -708,6 +749,45 @@ el("map-speeds").addEventListener("click", (e) => {
   if (mapSelected >= 0) selectMapNode(mapSelected);
 });
 
+// ---------------------------------------------------------------------------
+// Ship card — the current ship's effective stats (base class + owned upgrades).
+// Opened by tapping the ship strip at the dock.
+// ---------------------------------------------------------------------------
+function openShip() { buildShipStats(); el("shipcard").classList.remove("hiddenS"); }
+function closeShip() { el("shipcard").classList.add("hiddenS"); }
+
+function buildShipStats() {
+  const c = shipCls(), u = game.upgrades;
+  el("shipcard-art").innerHTML = SHIP_ART[game.cls];
+  el("shipcard-name").textContent = c.name;
+  el("shipcard-tag").textContent = c.tag;
+  const mult = (x) => x.toFixed(2) + "×";
+  const row = (lab, val, note, q = "") =>
+    `<div class="sc-row"><span class="sc-lab">${lab}</span>` +
+    `<span class="sc-val ${q}">${val}</span><span class="sc-note">${note || ""}</span></div>`;
+  const q = (x, lowerBetter) => {                 // strength/weakness vs the 1.0 baseline
+    if (Math.abs(x - 1) < 0.01) return "";
+    return (lowerBetter ? x < 1 : x > 1) ? "good" : "bad";
+  };
+  const owned = u.autopilot || autopilotAssist;
+  el("shipcard-stats").innerHTML =
+    row("Δv tank", tankCap().toFixed(0),
+      u.tank ? `base ${c.tank} + ${u.tank * 3} · Fuel Cell ×${u.tank}` : `base ${c.tank}`) +
+    row("fuel burn", mult(fuelFactor()),
+      "per Δv" + (u.drive ? ` · drive −${u.drive * 12}%` : ""), q(fuelFactor(), true)) +
+    row("felt load", mult(loadFactor()),
+      "maneuvering G" + (u.damper ? ` · dampers −${u.damper * 15}%` : ""), q(loadFactor(), true)) +
+    row("handling", mult(c.handling), "turn rate", q(c.handling, false)) +
+    row("contract pay", "×" + payMult().toFixed(2),
+      u.broker ? `broker +${u.broker * 8}%` : "no broker license", q(payMult(), false)) +
+    row("retires at", retireAge().toFixed(0),
+      u.rejuv ? `base ${RETIRE_AGE} + ${u.rejuv * 6} · rejuv` : `base ${RETIRE_AGE}`) +
+    row("docking assist", owned ? "installed" : "—", owned ? "auto-brakes to a clean dock" : "");
+}
+
+el("st-ship").addEventListener("click", openShip);
+el("shipcard-back").addEventListener("click", closeShip);
+
 function depart(c) {
   game.contract = { ...c, acceptCoord: ship.coordTime, acceptShip: ship.shipTime };
   game.integrity = 1;
@@ -879,6 +959,7 @@ function buildClassSelect() {
     const div = document.createElement("div");
     div.className = "classcard";
     div.innerHTML =
+      `<div class="cc-art">${SHIP_ART[key]}</div>` +
       `<div class="cc-head"><span class="cc-name">${c.name}</span><span class="cc-tag">${c.tag}</span></div>` +
       stat("Δv tank", c.pips.tank) + stat("fuel economy", c.pips.fuel) +
       stat("handling", c.pips.handling) + stat("cargo care", c.pips.care) +

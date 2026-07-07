@@ -231,6 +231,31 @@
   .lowfuel b { color: #fff; }
   .btn.urge { animation: pulse 1s infinite; }
 
+  /* ship silhouettes */
+  .ship-svg { display: block; width: 100%; height: 100%; }
+  .cc-art { display: flex; justify-content: center; align-items: center; height: 66px; margin-bottom: 10px; }
+  .cc-art .ship-svg { width: 66px; height: 66px; }
+
+  /* dock ship strip */
+  #st-ship { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 9px 12px;
+    border: 1px solid rgba(143,233,255,.22); border-radius: 8px; background: rgba(0,0,0,.25);
+    cursor: pointer; pointer-events: auto; }
+  #st-ship:hover { border-color: rgba(143,233,255,.5); background: rgba(8,20,28,.5); }
+  .ship-mini { width: 46px; height: 46px; flex: none; }
+  .ship-nm { color: #fff; font-size: 14px; }
+  .ship-nm .cc-tag { vertical-align: middle; margin-left: 4px; }
+  .ship-sub { color: var(--hud-dim); font-size: 11px; margin-top: 3px; }
+
+  /* ship-stats card */
+  .sc-head { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; }
+  .sc-art { width: 88px; height: 88px; flex: none; }
+  .sc-row { display: grid; grid-template-columns: 118px 66px 1fr; align-items: baseline; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid rgba(143,233,255,.1); font-size: 13px; }
+  .sc-lab { color: var(--hud-dim); }
+  .sc-val { color: #fff; font-variant-numeric: tabular-nums; letter-spacing: .3px; }
+  .sc-val.good { color: var(--ok); } .sc-val.bad { color: var(--gold); }
+  .sc-note { color: var(--hud-dim); font-size: 11px; }
+
   /* ship-class select */
   #class-list { display: flex; flex-wrap: wrap; gap: 12px; }
   .classcard { flex: 1 1 210px; min-width: 200px; border: 1px solid rgba(143,233,255,.22); border-radius: 10px;
@@ -377,6 +402,7 @@
     <div class="card">
       <h2 id="st-name">Station</h2>
       <div class="stat-line" id="st-stats"></div>
+      <div id="st-ship"></div>
       <div id="st-lowfuel" class="lowfuel" style="display:none"></div>
       <div id="st-offers"></div>
       <div id="st-shop"></div>
@@ -406,6 +432,20 @@
       <svg id="map-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
       <div id="map-detail"><span class="dim">Tap a station to plan the leg.</span></div>
       <button class="btn" id="map-back">◂ BACK TO DOCK</button>
+    </div>
+  </div>
+
+  <!-- SHIP CARD -->
+  <div id="shipcard" class="screen hiddenS">
+    <div class="card" style="max-width:600px">
+      <div class="sc-head">
+        <div class="sc-art" id="shipcard-art"></div>
+        <div><h2 id="shipcard-name" style="margin:0 0 4px">Ship</h2>
+          <span class="cc-tag" id="shipcard-tag"></span></div>
+      </div>
+      <div class="stat-line" style="margin:0 0 10px">Your ship's current performance — base hull plus every upgrade you own.</div>
+      <div id="shipcard-stats"></div>
+      <button class="btn" id="shipcard-back" style="margin-top:14px">◂ BACK TO DOCK</button>
     </div>
   </div>
 

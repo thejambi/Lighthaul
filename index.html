@@ -234,8 +234,25 @@
 
   /* ship silhouettes */
   .ship-svg { display: block; width: 100%; height: 100%; }
-  .cc-art { display: flex; justify-content: center; align-items: center; height: 66px; margin-bottom: 10px; }
+  .cc-art { position: relative; display: flex; justify-content: center; align-items: center; height: 66px;
+    margin-bottom: 10px; cursor: pointer; border-radius: 8px; }
   .cc-art .ship-svg { width: 66px; height: 66px; }
+  .cc-art .cc-testhint { position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
+    font-size: 9px; letter-spacing: 1px; color: var(--hud-dim); opacity: 0; transition: opacity .15s; white-space: nowrap; }
+  .cc-art:hover { background: rgba(143,233,255,.06); }
+  .cc-art:hover .cc-testhint { opacity: 1; color: var(--gold); }
+  #shipcard-art { cursor: pointer; }
+
+  /* test-flight banner */
+  #testBanner { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 6;
+    display: flex; align-items: center; gap: 12px; padding: 7px 8px 7px 16px; border-radius: 20px;
+    background: rgba(8,20,28,.9); border: 1px solid rgba(255,215,106,.5); color: var(--gold);
+    font-size: 12px; letter-spacing: 1.5px; text-shadow: 0 0 8px rgba(255,215,106,.4); }
+  #testBanner b { color: #fff; }
+  #tf-exit { pointer-events: auto; cursor: pointer; font: inherit; font-size: 11px; letter-spacing: 1px;
+    color: var(--hud); background: rgba(143,233,255,.1); border: 1px solid rgba(143,233,255,.4);
+    border-radius: 14px; padding: 5px 12px; }
+  #tf-exit:hover { background: rgba(143,233,255,.22); color: #fff; }
 
   /* dock ship strip */
   #st-ship { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 9px 12px;
@@ -446,7 +463,10 @@
       </div>
       <div class="stat-line" style="margin:0 0 10px">Your ship's current performance — base hull plus every upgrade you own.</div>
       <div id="shipcard-stats"></div>
-      <button class="btn" id="shipcard-back" style="margin-top:14px">◂ BACK TO DOCK</button>
+      <div style="margin-top:14px">
+        <button class="btn" id="shipcard-back">◂ BACK TO DOCK</button>
+        <button class="btn gold" id="shipcard-test">▸ TEST FLIGHT</button>
+      </div>
     </div>
   </div>
 
@@ -522,6 +542,10 @@
     <div id="reticle"></div>
     <div id="targetArrow">➤</div>
     <div id="countdown"></div>
+    <div id="testBanner" style="display:none">
+      <span>◈ TEST FLIGHT · <b id="tf-name">Ship</b></span>
+      <button id="tf-exit">EXIT</button>
+    </div>
     <div id="toast"></div>
     <div id="viewmode">◂ LOOKING ASTERN ▸</div>
 

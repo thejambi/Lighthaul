@@ -148,6 +148,7 @@ const game = {
   contract: null,
   integrity: 1,               // cargo/passenger condition on the current run (0..1)
   preflight: 0,               // seconds left in the frozen pre-launch/aim window
+  testFlight: false,          // free-flight sandbox — no contract, clock, fuel, or damage
   upgrades: { tank: 0, drive: 0, damper: 0, broker: 0, rejuv: 0, autopilot: 0 },
   lastResult: null,
 };
@@ -792,6 +793,40 @@ function buildShipStats() {
 el("st-ship").addEventListener("click", openShip);
 el("shipcard-back").addEventListener("click", closeShip);
 
+// ---------------------------------------------------------------------------
+// Test flight — take the current ship out for a free spin. No contract, clock,
+// fuel, or damage. Reached by tapping a ship silhouette (select cards / ship
+// card) or the ship card's TEST FLIGHT button. ESC / the EXIT chip returns you.
+// ---------------------------------------------------------------------------
+let testReturn = "station";
+function startTestFlight(clsKey, returnScreen) {
+  game.cls = clsKey;
+  game.testFlight = true;
+  game.contract = null;
+  game.preflight = 0;
+  testReturn = returnScreen;
+  ship.pos.copy(stations[game.station].pos);
+  ship.throttle = 0; ship.beta = 0;
+  ship.quat.identity();
+  dyn.prevBeta = 0; dyn.prevPhi = 0; dyn.load = 0;
+  av.yaw = av.pitch = av.roll = 0; dragYaw = dragPitch = 0; aimStation = null;
+  apBraking = false;
+  el("tf-name").textContent = shipCls().name;
+  el("testBanner").style.display = "flex";
+  closeShip(); closeMap();
+  setPhase("flight");
+}
+function exitTestFlight() {
+  if (!game.testFlight) return;
+  game.testFlight = false;
+  el("testBanner").style.display = "none";
+  el("contract").style.display = "";        // restore the tracker for real flights
+  setPhase(testReturn);
+}
+el("tf-exit").addEventListener("click", exitTestFlight);
+el("shipcard-test").addEventListener("click", () => startTestFlight(game.cls, "station"));
+el("shipcard-art").addEventListener("click", () => startTestFlight(game.cls, "station"));
+
 function depart(c) {
   game.contract = { ...c, acceptCoord: ship.coordTime, acceptShip: ship.shipTime };
   game.integrity = 1;
@@ -851,7 +886,7 @@ function dock() {
 }
 
 function callTow() {
-  if (game.phase !== "flight") return;
+  if (game.phase !== "flight" || game.testFlight) return;   // nothing to tow in a free flight
   const c = game.contract;
   let nearest = 0, best = Infinity;
   stations.forEach((s, i) => {
@@ -966,7 +1001,8 @@ function buildClassSelect() {
     const div = document.createElement("div");
     div.className = "classcard";
     div.innerHTML =
-      `<div class="cc-art">${SHIP_ART[key]}</div>` +
+      `<div class="cc-art" data-cls="${key}" title="Take it for a test flight">${SHIP_ART[key]}` +
+      `<span class="cc-testhint">▸ test fly</span></div>` +
       `<div class="cc-head"><span class="cc-name">${c.name}</span><span class="cc-tag">${c.tag}</span></div>` +
       stat("Δv tank", c.pips.tank) + stat("fuel economy", c.pips.fuel) +
       stat("handling", c.pips.handling) + stat("cargo care", c.pips.care) +
@@ -977,6 +1013,8 @@ function buildClassSelect() {
   }
   box.querySelectorAll("button[data-cls]").forEach((b) =>
     b.addEventListener("click", () => applyClass(b.dataset.cls)));
+  box.querySelectorAll(".cc-art[data-cls]").forEach((a) =>
+    a.addEventListener("click", () => startTestFlight(a.dataset.cls, "select")));
 }
 
 function applyClass(key) {
@@ -990,6 +1028,7 @@ buildClassSelect();
 window.addEventListener("keydown", (e) => {
   if (game.phase === "title") { start(); return; }
   if (game.phase !== "flight") return;
+  if (e.code === "Escape") { exitTestFlight(); return; }   // leave a test flight
   keys.add(e.code);
   if (e.code === "Space") e.preventDefault();
   if (e.code === "KeyH") toggleUI();
@@ -1328,7 +1367,7 @@ function update(dt) {
 
   // --- assisted aim: the autopilot holds the contract target; a tapped marker
   // slews the ship onto it. Both defer the instant you steer manually.
-  const aimGoal = autopilotAssist ? stations[game.contract.to].pos : (aimStation && aimStation.pos);
+  const aimGoal = (autopilotAssist && game.contract) ? stations[game.contract.to].pos : (aimStation && aimStation.pos);
   if (aimGoal && !manualSteer) {
     // launch aim is quick; a deliberate tap is snappier than the autopilot's gentle hold
     const aimRate = launching ? AIM_RATE : (autopilotAssist ? AIM_RATE * 0.5 : AIM_RATE * 1.3);
@@ -1344,7 +1383,7 @@ function update(dt) {
   // S key — a steady throttle-down at the normal rate — kicked off at the precise
   // distance where that brings you to dock speed right at the 15 ly mark. The
   // start point is found by forward-simulating the hold-S trajectory.
-  if (autopilotAssist && game.fuel > 0 && !launching) {
+  if (autopilotAssist && game.contract && game.fuel > 0 && !launching) {
     const apTgt = stations[game.contract.to];
     const apDist = apTgt.pos.distanceTo(ship.pos);
     _dir.copy(apTgt.pos).sub(ship.pos).normalize();
@@ -1368,25 +1407,27 @@ function update(dt) {
   const phi = rapidity(ship.beta);
   const dphi = Math.abs(phi - dyn.prevPhi);
   dyn.prevPhi = phi;
-  if (dphi > 0) game.fuel = Math.max(0, game.fuel - dphi * fuelFactor());
+  if (dphi > 0 && !game.testFlight) game.fuel = Math.max(0, game.fuel - dphi * fuelFactor());
 
   // --- pilot-frame pacing: universe time & distance scale with γ (capped).
-  // Frozen during the launch window (no motion, no clocks, no aging).
+  // Frozen during the launch window (no motion, no clocks, no aging). In a free
+  // test flight there's no contract and no career clock — just movement.
   const c = game.contract;
-  const tgt = stations[c.to];
+  const tgt = c ? stations[c.to] : null;
   let dCoord = 0;
   if (!launching) {
     const gPace = GAMMA_CAP * Math.tanh(gamma / GAMMA_CAP);
     dCoord = PROPER_RATE * gPace * dt;
-    const ds = ship.beta * dCoord;
-    ship.pos.addScaledVector(_fwd, ds);
-    ship.coordTime += dCoord;
-    const dShip = dCoord / gamma;
-    ship.shipTime += dShip;
-    game.pilotAge += dShip;
+    ship.pos.addScaledVector(_fwd, ship.beta * dCoord);
+    if (!game.testFlight) {                     // test flight doesn't burn the career clock
+      ship.coordTime += dCoord;
+      const dShip = dCoord / gamma;
+      ship.shipTime += dShip;
+      game.pilotAge += dShip;
+    }
   }
-  const dist = tgt.pos.distanceTo(ship.pos);
-  if (!launching && dist < DOCK_RADIUS && ship.beta < DOCK_BETA) { dock(); return; }
+  const dist = tgt ? tgt.pos.distanceTo(ship.pos) : 0;
+  if (!launching && c && dist < DOCK_RADIUS && ship.beta < DOCK_BETA) { dock(); return; }
 
   // --- push uniforms ---
   for (const layer of layers) {
@@ -1413,9 +1454,12 @@ function update(dt) {
                      THREE.MathUtils.clamp(omegaTurn * ship.beta * 5, 0, 10)) * loadFactor();
   dyn.load += (loadTarget - dyn.load) * Math.min(1, dt * 5);
 
-  // exceed the contract's inertial rating and you damage the load
-  const overG = dyn.load - game.contract.gLimit;
-  if (overG > 0) game.integrity = Math.max(0, game.integrity - overG * DMG_RATE * dt);
+  // exceed the contract's inertial rating and you damage the load (no cargo to
+  // stress in a free test flight)
+  if (c) {
+    const overG = dyn.load - c.gLimit;
+    if (overG > 0) game.integrity = Math.max(0, game.integrity - overG * DMG_RATE * dt);
+  }
 
   const surge = THREE.MathUtils.clamp(Math.abs(coordAccel) / 2.2, 0, 1);
   const feltSurge = Math.max(surge, THREE.MathUtils.clamp(dyn.load / 22, 0, 1));
@@ -1464,9 +1508,10 @@ function updateHUD(gamma, dist, coordRate) {
   hud.pct.textContent = (pctC >= 99.99 ? fmt(pctC, 4) : fmt(pctC, 3)) + " %c";
   hud.beta.textContent = ship.beta.toFixed(ship.beta > 0.999 ? 7 : 6);
   hud.gamma.textContent = gamma > 1000 ? gamma.toExponential(2) : fmt(gamma, 4);
-  const over = dyn.load > game.contract.gLimit;
-  hud.gforce.textContent = fmt(dyn.load, 1) + " / " + game.contract.gLimit + " g";
-  hud.gforce.style.color = over ? "var(--warn)" : dyn.load > game.contract.gLimit * 0.8 ? "var(--gold)" : "var(--hud)";
+  const gl = game.contract && game.contract.gLimit;
+  const over = gl && dyn.load > gl;
+  hud.gforce.textContent = fmt(dyn.load, 1) + (gl ? " / " + gl + " g" : " g");
+  hud.gforce.style.color = over ? "var(--warn)" : (gl && dyn.load > gl * 0.8) ? "var(--gold)" : "var(--hud)";
   hud.age.textContent = game.pilotAge.toFixed(1) + " yr";
   hud.credits.textContent = "₡" + game.credits;
   const cap = tankCap();
@@ -1477,8 +1522,16 @@ function updateHUD(gamma, dist, coordRate) {
   hud.throttleFill.style.height = (ship.throttle * 100) + "%";
   hud.throttlePct.textContent = game.fuel <= 0 ? "DEAD STICK" : Math.round(ship.throttle * 100) + "%";
 
-  // contract tracker
+  hud.fxAberr.className = fx.aberration ? "on" : "";
+  hud.fxDoppler.className = fx.doppler ? "on" : "";
+  hud.fxBeam.className = fx.beaming ? "on" : "";
+  hud.fxContract.className = fx.contraction ? "on" : "";
+  hud.fxCmb.className = fx.cmb ? "on" : "";
+
+  // contract tracker — hidden in a free test flight (no contract)
   const c = game.contract;
+  if (!c) { el("contract").style.display = "none"; hud.countdown.style.display = "none"; return; }
+  el("contract").style.display = "";
   hud.cDist.textContent = dist.toFixed(1) + " ly";
   const remaining = c.deadline - (ship.coordTime - c.acceptCoord);
   hud.cDeadline.textContent = "T−" + fmtY(Math.max(0, remaining));
@@ -1537,12 +1590,6 @@ function updateHUD(gamma, dist, coordRate) {
   } else if (hud.countdown.style.display !== "none") {
     hud.countdown.style.display = "none";
   }
-
-  hud.fxAberr.className = fx.aberration ? "on" : "";
-  hud.fxDoppler.className = fx.doppler ? "on" : "";
-  hud.fxBeam.className = fx.beaming ? "on" : "";
-  hud.fxContract.className = fx.contraction ? "on" : "";
-  hud.fxCmb.className = fx.cmb ? "on" : "";
 }
 
 function updateLabels() {

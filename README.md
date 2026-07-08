@@ -69,11 +69,12 @@ the load takes; upgrades stack on top, so you patch a weakness over a career.
 *Deadhead* to *Lightspeed Legend* — and your best careers (richest retirement,
 most deliveries) persist as records to beat on your next run.
 
-**Star chart** (the ★ button at a dock) is a trip planner: a top-down map of the
-cluster with your open contracts as gold routes. Pick a cruise speed and tap any
-station to see that leg's real cost — distance, Δv (vs. your tank), universe-time,
-and the ship-years you'd age — with a live ✓/✗ on whether that speed meets the
-contract's deadline or γ requirement. Accept a run straight from the map.
+**Star chart.** The dock's contract browser *is* a top-down map of the cluster:
+your three offers appear as gold routes, each labelled with its pay and g-rating
+plus a live ✓/✗ for the cruise speed you've picked. Tap any station (node or
+label — finger-sized targets) to see the leg's real cost — distance, Δv (vs.
+your tank), universe-time, and the ship-years you'd age — and accept a run
+straight from the map. Non-contract stations work as a pure trip planner.
 
 ## Controls
 

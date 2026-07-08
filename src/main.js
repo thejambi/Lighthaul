@@ -496,9 +496,9 @@ function makeContracts(fromIdx) {
 // Phase / screens
 // ---------------------------------------------------------------------------
 const el = (id) => document.getElementById(id);
-// #starmap is listed so setPhase hides it on any real transition; it's never a
+// #shipcard is listed so setPhase hides it on any real transition; it's never a
 // phase itself — it's opened as an overlay on the station screen.
-const screens = { title: el("title"), select: el("select"), station: el("station"), results: el("results"), over: el("gameover"), map: el("starmap"), ship: el("shipcard") };
+const screens = { title: el("title"), select: el("select"), station: el("station"), results: el("results"), over: el("gameover"), ship: el("shipcard") };
 
 function setPhase(p) {
   game.phase = p;
@@ -507,7 +507,7 @@ function setPhase(p) {
   if (p !== "flight") audio.silence();     // don't let the engine drone hang on non-flight screens
   // generate the three contracts once, on arrival — not on every re-render
   // (so refuelling doesn't re-roll the offers)
-  if (p === "station") { game.offers = makeContracts(game.station); buildStation(); }
+  if (p === "station") { game.offers = makeContracts(game.station); mapSelected = -1; buildStation(); }
   if (p === "results") buildResults();
   if (p === "over") buildGameOver();
   markDirty();
@@ -515,16 +515,7 @@ function setPhase(p) {
 
 function fmtY(y) { return y >= 1000 ? (y / 1000).toFixed(2) + " kyr" : y.toFixed(1) + " yr"; }
 
-// two-tap confirm for accepting a contract (undocking commits you to the run)
-let armedOffer = null, armedTimer = null;
-function disarmOffer() {
-  if (armedOffer) { armedOffer.textContent = "ACCEPT & UNDOCK"; armedOffer.classList.remove("armed"); }
-  armedOffer = null;
-  clearTimeout(armedTimer);
-}
-
 function buildStation() {
-  disarmOffer();
   const s = stations[game.station];
   el("st-name").textContent = "Docked · " + s.name;
   el("st-stats").innerHTML =
@@ -537,38 +528,6 @@ function buildStation() {
     `<div class="ship-mini">${SHIP_ART[game.cls]}</div>` +
     `<div class="ship-meta"><div class="ship-nm">${shipCls().name} <span class="cc-tag">${shipCls().tag}</span></div>` +
     `<div class="ship-sub">tap for ship stats ▸</div></div>`;
-
-  const box = el("st-offers");
-  box.innerHTML = "";
-  game.offers.forEach((c, i) => {
-    const div = document.createElement("div");
-    div.className = "offer";
-    const need = c.type === "cargo"
-      ? `needs ≥ <b>${Math.min(0.99, c.d / c.deadline).toFixed(2)}c</b> average`
-      : `keep average γ ≥ <b>${(c.d / c.maxAging).toFixed(1)}</b> (they may age ≤ ${c.maxAging.toFixed(1)} yr)`;
-    const frag = c.gLimit <= 6 ? ` · <b class="frag">fragile: ${c.gLimit}g rating</b>`
-                               : ` · rugged: ${c.gLimit}g rating`;
-    div.innerHTML =
-      `<div class="t">${c.type === "cargo" ? "FREIGHT — " + c.what : "PASSAGE — " + c.what}` +
-      `<span class="pay">₡${contractPay(c)}</span></div>` +
-      `<div class="sub">to <b>${stations[c.to].name}</b> · ${c.d.toFixed(0)} ly · ` +
-      `deadline ${fmtY(c.deadline)} (universe) · ${need}${frag}</div>` +
-      `<button class="btn" data-i="${i}">ACCEPT & UNDOCK</button>`;
-    const btn = div.querySelector("button");
-    btn.addEventListener("click", () => {
-      if (armedOffer !== btn) {          // first tap arms this offer (disarms any other)
-        disarmOffer();
-        armedOffer = btn;
-        btn.textContent = "CONFIRM UNDOCK";
-        btn.classList.add("armed");
-        armedTimer = setTimeout(disarmOffer, 3000);
-        return;
-      }
-      disarmOffer();                      // second tap confirms
-      depart(c);
-    });
-    box.appendChild(div);
-  });
 
   const missing = tankCap() - game.fuel;
   const rf = el("st-refuel");
@@ -591,6 +550,15 @@ function buildStation() {
     `⚠ LOW Δv — <b>${game.fuel.toFixed(1)}</b> in the tank. A fast leg (~0.99c out and brake) ` +
     `burns about <b>5</b>; top up before you undock or you risk a dead stick.`;
   rf.classList.toggle("urge", low && !rf.disabled);
+
+  // the star chart IS the contract browser — render it as part of the dock.
+  // Selection survives a re-render (refuel/upgrade) and resets on arrival.
+  if (mapSelected >= 0) {
+    selectMapNode(mapSelected);
+  } else {
+    buildStarMap();
+    el("map-detail").innerHTML = '<span class="dim">Tap a destination to plan the leg — ✓/✗ shows what your chosen speed can deliver.</span>';
+  }
 
   buildShop();
 }
@@ -646,21 +614,20 @@ el("st-refuel").addEventListener("click", () => {
 el("st-retire").addEventListener("click", () => setPhase("over"));
 
 // ---------------------------------------------------------------------------
-// Star chart — a trip planner. Nodes are stations; gold routes are open
-// contracts. Pick a cruise speed and tap a station to see the leg's real cost.
+// Star chart — the dock's contract browser & trip planner, rendered inside the
+// station screen. Nodes are stations; gold routes are open contracts, each with
+// pay + g-rating and a live ✓/✗ for the chosen cruise speed. Every station sits
+// in a large invisible hit-group (node + label both tappable — finger-sized).
 // ---------------------------------------------------------------------------
 let mapBeta = 0.999;
 let mapSelected = -1;
-const SVGNS = "http://www.w3.org/2000/svg";
 
-function openMap() {
-  mapSelected = -1;
-  buildStarMap();
-  el("map-detail").innerHTML = '<span class="dim">Tap a station to plan the leg.</span>';
-  el("map-title").textContent = "Star Chart · " + stations[game.station].name;
-  el("starmap").classList.remove("hiddenS");
+// can this contract be delivered cruising at beta b, on the current tank?
+function contractFeasible(c, b) {
+  const g = lorentz(b);
+  const meets = c.type === "cargo" ? c.d / b <= c.deadline : c.d / (b * g) <= c.maxAging;
+  return meets && 2 * rapidity(b) <= game.fuel;
 }
-function closeMap() { el("starmap").classList.add("hiddenS"); }
 
 function buildStarMap() {
   const svg = el("map-svg");
@@ -684,12 +651,24 @@ function buildStarMap() {
   }
   stations.forEach((st, i) => {
     const isDock = i === game.station;
-    const isDest = game.offers.some((c) => c.to === i);
-    const cls = isDock ? "dock" : isDest ? "dest" : "node";
-    const r = isDock ? 2.4 : isDest ? 2.0 : 1.3;
-    out += `<circle cx="${st._mx}" cy="${st._my}" r="${r}" class="map-node ${cls}" data-i="${i}"/>`;
+    const c = game.offers.find((o) => o.to === i);
+    const cls = isDock ? "dock" : c ? "dest" : "node";
+    const r = isDock ? 2.4 : c ? 2.0 : 1.3;
     const nm = st.name.replace(/ (Station|Anchorage|Depot|Yards|Relay|Port|Hub|Gate)$/, "");
-    out += `<text x="${st._mx + 3}" y="${st._my + 1}" class="map-label ${cls}">${nm}</text>`;
+    // flip labels to the left near the right edge so text stays on the chart
+    const flip = st._mx > 72;
+    const tx = flip ? st._mx - 3 : st._mx + 3;
+    const anchor = flip ? ' text-anchor="end"' : "";
+    out += `<g class="map-hit" data-i="${i}">` +
+      `<circle cx="${st._mx}" cy="${st._my}" r="6" class="hit"/>` +
+      `<circle cx="${st._mx}" cy="${st._my}" r="${r}" class="map-node ${cls}"/>` +
+      `<text x="${tx}" y="${st._my + 1}"${anchor} class="map-label ${cls}">${nm}</text>`;
+    if (c) {
+      const ok = contractFeasible(c, mapBeta);
+      out += `<text x="${tx}" y="${st._my + 4.6}"${anchor} class="map-sub ${ok ? "ok" : "no"}">` +
+        `${ok ? "✓" : "✗"} ₡${contractPay(c)} · ${c.gLimit}g</text>`;
+    }
+    out += `</g>`;
   });
   svg.innerHTML = out;
 }
@@ -698,7 +677,7 @@ function selectMapNode(i) {
   mapSelected = i;
   buildStarMap();
   // highlight selection
-  const node = el("map-svg").querySelector(`.map-node[data-i="${i}"]`);
+  const node = el("map-svg").querySelector(`g[data-i="${i}"] .map-node`);
   if (node) node.classList.add("sel");
   const edge = el("map-svg").querySelector(`.map-edge[data-edge="${i}"]`);
   if (edge) edge.classList.add("sel");
@@ -724,10 +703,11 @@ function selectMapNode(i) {
       ? `deadline ${fmtY(c.deadline)} — need ≥ ${Math.min(0.99, c.d / c.deadline).toFixed(2)}c`
       : `age cap ${c.maxAging.toFixed(1)} yr — need γ ≥ ${(c.d / c.maxAging).toFixed(1)}`;
     const meets = c.type === "cargo" ? uni <= c.deadline : aged <= c.maxAging;
+    const frag = c.gLimit <= 6 ? `<span class="bad">fragile: ${c.gLimit}g</span>` : `${c.gLimit}g`;
     html += `<span class="k">${c.type === "cargo" ? "FREIGHT" : "PASSAGE"}</span> ${c.what} · ` +
-            `<span class="gold-t">₡${contractPay(c)}</span> · ${c.gLimit}g<br/>` +
+            `<span class="gold-t">₡${contractPay(c)}</span> · ${frag}<br/>` +
             `<span class="${meets ? "good" : "bad"}">${meets ? "✓ meets" : "✗ misses"}</span> ${need}` +
-            ` <button class="btn ${meets ? "gold" : ""}" id="map-accept" style="margin-left:8px;padding:5px 12px">ACCEPT</button>`;
+            ` <button class="btn ${meets ? "gold" : ""}" id="map-accept" style="margin-left:8px;padding:5px 12px">ACCEPT & UNDOCK</button>`;
   } else {
     html += `<span class="dim">no contract to this station</span>`;
   }
@@ -735,15 +715,14 @@ function selectMapNode(i) {
 
   const acc = el("map-accept");
   if (acc) acc.addEventListener("click", () => {
-    if (acc.dataset.armed) { closeMap(); depart(c); }
-    else { acc.dataset.armed = "1"; acc.textContent = "CONFIRM"; acc.classList.add("armed"); }
+    if (acc.dataset.armed) depart(c);
+    else { acc.dataset.armed = "1"; acc.textContent = "CONFIRM UNDOCK"; acc.classList.add("armed"); }
   });
 }
 
-el("st-map").addEventListener("click", openMap);
-el("map-back").addEventListener("click", closeMap);
+// tap anywhere in a station's hit-group (node, label, or the padding around them)
 el("map-svg").addEventListener("click", (e) => {
-  const t = e.target.closest(".map-node");
+  const t = e.target.closest("[data-i]");
   if (t) selectMapNode(+t.dataset.i);
 });
 el("map-speeds").addEventListener("click", (e) => {
@@ -752,6 +731,7 @@ el("map-speeds").addEventListener("click", (e) => {
   mapBeta = parseFloat(btn.dataset.b);
   el("map-speeds").querySelectorAll(".mapspd").forEach((b) => b.classList.toggle("active", b === btn));
   if (mapSelected >= 0) selectMapNode(mapSelected);
+  else buildStarMap();                    // recolor the ✓/✗ sub-lines for the new speed
 });
 
 // ---------------------------------------------------------------------------
@@ -813,7 +793,7 @@ function startTestFlight(clsKey, returnScreen) {
   apBraking = false;
   el("tf-name").textContent = shipCls().name;
   el("testBanner").style.display = "flex";
-  closeShip(); closeMap();
+  closeShip();
   setPhase("flight");
 }
 function exitTestFlight() {

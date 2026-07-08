@@ -631,17 +631,58 @@ function contractFeasible(c, b) {
 
 function buildStarMap() {
   const svg = el("map-svg");
-  const pad = 12, W = 100, H = 100;
+  // Match the viewBox to the rendered box: a square viewBox in a wide container
+  // letterboxes the chart into the middle, wasting the whole margin. H stays 100
+  // so font/radius sizes render the same; W stretches to the real aspect.
+  const rect = svg.getBoundingClientRect();     // clientWidth/Height are 0 on SVG elements
+  const aspect = rect.height > 40               // trust only a real layout, not a collapsed one
+    ? Math.min(2.6, Math.max(1, rect.width / rect.height)) : 1.9;
+  const H = 100, W = Math.round(H * aspect), pad = 12;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const s of stations) {
     minX = Math.min(minX, s.pos.x); maxX = Math.max(maxX, s.pos.x);
     minZ = Math.min(minZ, s.pos.z); maxZ = Math.max(maxZ, s.pos.z);
   }
   const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-  const span = Math.max(maxX - minX, maxZ - minZ, 1) * 1.02;
-  const X = (x) => W / 2 + (x - cx) / span * (W - 2 * pad);
-  const Y = (z) => H / 2 + (z - cz) / span * (H - 2 * pad);
-  stations.forEach((s) => { s._mx = X(s.pos.x); s._my = Y(s.pos.z); });
+  // one uniform scale, but fit each axis against its own frame edge — an
+  // elongated cluster zooms until its long axis fills the chart instead of
+  // shrinking to leave empty margins on the short one
+  const scale = Math.min((W - 2 * pad) / Math.max(maxX - minX, 1),
+                         (H - 2 * pad) / Math.max(maxZ - minZ, 1));
+  stations.forEach((s) => {
+    s._mx = W / 2 + (s.pos.x - cx) * scale;
+    s._my = H / 2 + (s.pos.z - cz) * scale;
+  });
+
+  // Label layout: estimate each label's footprint and dodge neighbours — prefer
+  // the right side, flip left or nudge vertically when names would collide.
+  // `placed` starts with every node dot so labels never sit on other stations.
+  const placed = stations.map((st) => ({ x1: st._mx - 2.6, y1: st._my - 2.6, x2: st._mx + 2.6, y2: st._my + 2.6 }));
+  const collides = (b, skip) => placed.some((o, idx) =>
+    idx !== skip && b.x1 < o.x2 && b.x2 > o.x1 && b.y1 < o.y2 && b.y2 > o.y1);
+  stations.forEach((st, i) => {
+    const c = game.offers.find((o) => o.to === i);
+    st._nm = st.name.replace(/ (Station|Anchorage|Depot|Yards|Relay|Port|Hub|Gate)$/, "");
+    let w = 3 + st._nm.length * 1.9;                     // ~monospace advance at font-size 3
+    if (c) w = Math.max(w, 24);                          // the ✓/✗ sub-line can be wider than the name
+    const up = 2.4, dn = c ? 6.2 : 2.2;                  // taller footprint when a sub-line follows
+    const box = (side, dy) => side > 0
+      ? { x1: st._mx + 2, y1: st._my + dy - up, x2: st._mx + 2 + w, y2: st._my + dy + dn }
+      : { x1: st._mx - 2 - w, y1: st._my + dy - up, x2: st._mx - 2, y2: st._my + dy + dn };
+    const pref = st._mx + 3 + w > W - 2 ? -1 : 1;        // flip when the frame edge is in the way
+    const alt = -pref;
+    const fits = (b) => b.x1 >= 1 && b.x2 <= W - 1 && b.y1 >= 0.5 && b.y2 <= H - 0.5;
+    let pick = [pref, 0];
+    for (const cand of [[pref, 0], [alt, 0], [pref, 5], [pref, -5], [alt, 5], [alt, -5],
+                        [pref, 9], [alt, 9], [pref, -9], [alt, -9]]) {
+      const b = box(cand[0], cand[1]);
+      if (fits(b) && !collides(b, i)) { pick = cand; break; }
+    }
+    st._lside = pick[0]; st._ldy = pick[1];
+    placed.push(box(pick[0], pick[1]));
+  });
 
   let out = "";
   const dock = stations[game.station];
@@ -654,18 +695,15 @@ function buildStarMap() {
     const c = game.offers.find((o) => o.to === i);
     const cls = isDock ? "dock" : c ? "dest" : "node";
     const r = isDock ? 2.4 : c ? 2.0 : 1.3;
-    const nm = st.name.replace(/ (Station|Anchorage|Depot|Yards|Relay|Port|Hub|Gate)$/, "");
-    // flip labels to the left near the right edge so text stays on the chart
-    const flip = st._mx > 72;
-    const tx = flip ? st._mx - 3 : st._mx + 3;
-    const anchor = flip ? ' text-anchor="end"' : "";
+    const tx = st._lside > 0 ? st._mx + 3 : st._mx - 3;
+    const anchor = st._lside > 0 ? "" : ' text-anchor="end"';
     out += `<g class="map-hit" data-i="${i}">` +
       `<circle cx="${st._mx}" cy="${st._my}" r="6" class="hit"/>` +
       `<circle cx="${st._mx}" cy="${st._my}" r="${r}" class="map-node ${cls}"/>` +
-      `<text x="${tx}" y="${st._my + 1}"${anchor} class="map-label ${cls}">${nm}</text>`;
+      `<text x="${tx}" y="${st._my + 1 + st._ldy}"${anchor} class="map-label ${cls}">${st._nm}</text>`;
     if (c) {
       const ok = contractFeasible(c, mapBeta);
-      out += `<text x="${tx}" y="${st._my + 4.6}"${anchor} class="map-sub ${ok ? "ok" : "no"}">` +
+      out += `<text x="${tx}" y="${st._my + 4.6 + st._ldy}"${anchor} class="map-sub ${ok ? "ok" : "no"}">` +
         `${ok ? "✓" : "✗"} ₡${contractPay(c)} · ${c.gLimit}g</text>`;
     }
     out += `</g>`;
@@ -1636,6 +1674,10 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
   for (const l of layers) l.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+  // the star chart's viewBox tracks its container aspect — refit on resize
+  if (game.phase === "station") {
+    if (mapSelected >= 0) selectMapNode(mapSelected); else buildStarMap();
+  }
   markDirty();
 });
 

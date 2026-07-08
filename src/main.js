@@ -69,7 +69,7 @@ const UPGRADES = {
   damper:    { icon: "◇", name: "Inertial Dampers", desc: "−15% felt maneuvering load",  costs: [260, 420, 600] },
   broker:    { icon: "✦", name: "Broker License",   desc: "+8% pay on every contract",   costs: [280, 460, 640] },
   rejuv:     { icon: "✚", name: "Rejuv Course",      desc: "+6 yr before retirement",     costs: [300, 460, 640, 840] },
-  overdrive: { icon: "»", name: "Redline Coils",    desc: "top speed a 9 nearer c — more γ, less aging", costs: [400, 720] },
+  overdrive: { icon: "»", name: "Redline Coils",    desc: "top speed a 9 nearer c — more γ, less aging", costs: [400, 720, 1150, 1700, 2400, 3300] },
   autopilot: { icon: "◈", name: "Docking Assist",   desc: "auto-brakes to a clean dock", costs: [500], oneShot: true },
 };
 
@@ -203,7 +203,9 @@ const GAMMA_CAP = 40;
 // Effective speed cap. C_CAP is the stock governor; each Redline Coils level
 // shrinks the remaining gap to c by 10× (adds a nine), so top-throttle γ climbs
 // and you age even less — for more Δv.
-function capBeta() { return 1 - (1 - C_CAP) * Math.pow(10, -game.upgrades.overdrive); }
+// clamp keeps 1−β ≥ 5e-13 (γ ≈ 1e6): below that, doubles round β to exactly 1
+// and γ/rapidity blow up to Infinity. Level 6 sits right at that floor.
+function capBeta() { return Math.min(1 - 5e-13, 1 - (1 - C_CAP) * Math.pow(10, -game.upgrades.overdrive)); }
 
 function throttleToBeta(t) {
   t = Math.max(0, Math.min(1, t));
@@ -1085,7 +1087,7 @@ function updateAutopilotIndicator(doFlash) {
 }
 
 // Owned outfits shown as a compact HUD badge (autopilot has its own green badge).
-const ROMAN = ["", "I", "II", "III", "IV"];
+const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 function updateBadges() {
   const b = el("upgradeBadge");
   const owned = UP_KEYS.filter((k) => k !== "autopilot" && game.upgrades[k] > 0);

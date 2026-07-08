@@ -54,8 +54,10 @@ few escalating tiers: a **Fuel Cell Array** (+Δv capacity, for one bigger leg),
 **Inertial Dampers** (−felt maneuvering load, so you can burn and brake harder
 without stressing fragile freight), a **Broker License** (+pay on every
 contract), a **Rejuv Course** (+years before mandatory retirement — buy more
-career), and a **Docking Assist** that auto-brakes you to a clean dock. Levels
-persist across the career and show as badges on the flight HUD.
+career), **Redline Coils** (each level pushes your top speed a nine closer to
+*c* — higher γ, so you age even less at full throttle, for the extra Δv it costs
+to get there), and a **Docking Assist** that auto-brakes you to a clean dock.
+Levels persist across the career and show as badges on the flight HUD.
 
 **Ship classes.** Each career opens with a choice of hull, and you fly the whole
 run in it — the forgiving all-round **Courier**, the big-tank rugged-cargo

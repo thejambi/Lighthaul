@@ -69,6 +69,7 @@ const UPGRADES = {
   damper:    { icon: "◇", name: "Inertial Dampers", desc: "−15% felt maneuvering load",  costs: [260, 420, 600] },
   broker:    { icon: "✦", name: "Broker License",   desc: "+8% pay on every contract",   costs: [280, 460, 640] },
   rejuv:     { icon: "✚", name: "Rejuv Course",      desc: "+6 yr before retirement",     costs: [300, 460, 640, 840] },
+  overdrive: { icon: "»", name: "Redline Coils",    desc: "top speed a 9 nearer c — more γ, less aging", costs: [400, 720] },
   autopilot: { icon: "◈", name: "Docking Assist",   desc: "auto-brakes to a clean dock", costs: [500], oneShot: true },
 };
 
@@ -149,7 +150,7 @@ const game = {
   integrity: 1,               // cargo/passenger condition on the current run (0..1)
   preflight: 0,               // seconds left in the frozen pre-launch/aim window
   testFlight: false,          // free-flight sandbox — no contract, clock, fuel, or damage
-  upgrades: { tank: 0, drive: 0, damper: 0, broker: 0, rejuv: 0, autopilot: 0 },
+  upgrades: { tank: 0, drive: 0, damper: 0, broker: 0, rejuv: 0, overdrive: 0, autopilot: 0 },
   lastResult: null,
 };
 
@@ -199,14 +200,19 @@ const ship = {
 const PROPER_RATE = 0.4;
 const GAMMA_CAP = 40;
 
+// Effective speed cap. C_CAP is the stock governor; each Redline Coils level
+// shrinks the remaining gap to c by 10× (adds a nine), so top-throttle γ climbs
+// and you age even less — for more Δv.
+function capBeta() { return 1 - (1 - C_CAP) * Math.pow(10, -game.upgrades.overdrive); }
+
 function throttleToBeta(t) {
   t = Math.max(0, Math.min(1, t));
-  return Math.min(1 - Math.pow(1 - t, 3), C_CAP);
+  return Math.min(1 - Math.pow(1 - t, 3), capBeta());
 }
 function betaToThrottle(b) {
-  return 1 - Math.cbrt(1 - Math.min(b, C_CAP));
+  return 1 - Math.cbrt(1 - Math.min(b, capBeta()));
 }
-const rapidity = (b) => Math.atanh(Math.min(b, C_CAP));
+const rapidity = (b) => Math.atanh(Math.min(b, capBeta()));
 
 // Forward-simulate "holding S" from a given speed to find how many ly it takes
 // to bleed down to dock speed — i.e. the distance out at which the autopilot must
@@ -801,6 +807,8 @@ function buildShipStats() {
     row("felt load", mult(loadFactor()),
       "maneuvering G" + (u.damper ? ` · dampers −${u.damper * 15}%` : ""), q(loadFactor(), true)) +
     row("handling", mult(c.handling), "turn & throttle response", q(c.handling, false)) +
+    row("top speed", "γ ≤ " + Math.round(lorentz(capBeta())).toLocaleString(),
+      u.overdrive ? `redline ×${u.overdrive} — nearer c` : "stock governor", u.overdrive ? "good" : "") +
     row("contract pay", "×" + payMult().toFixed(2),
       u.broker ? `broker +${u.broker * 8}%` : "no broker license", q(payMult(), false)) +
     row("retires at", retireAge().toFixed(0),

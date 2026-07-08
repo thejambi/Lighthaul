@@ -66,6 +66,19 @@
   #stats .row .v { color: var(--hud); font-variant-numeric: tabular-nums; }
   #stats .big { font-size: 22px; letter-spacing: .5px; }
   #stats .big .v { color: #fff; }
+  /* redline payoff: at extreme γ the SPEED & Lorentz readouts go red and buzz.
+     Amplitude scales via the --shake custom property set in JS. */
+  #stats .row .v.redline { color: var(--warn); text-shadow: 0 0 10px rgba(255,106,90,.8);
+    animation: redline-buzz .08s infinite linear; }
+  @keyframes redline-buzz {
+    0%   { transform: translate(calc(var(--shake,.4) *  1px),  calc(var(--shake,.4) * -.8px)); }
+    20%  { transform: translate(calc(var(--shake,.4) * -.9px), calc(var(--shake,.4) *  .6px)); }
+    40%  { transform: translate(calc(var(--shake,.4) *  .7px), calc(var(--shake,.4) *  .9px)); }
+    60%  { transform: translate(calc(var(--shake,.4) * -.8px), calc(var(--shake,.4) * -.7px)); }
+    80%  { transform: translate(calc(var(--shake,.4) *  .9px), calc(var(--shake,.4) *  .5px)); }
+    100% { transform: translate(calc(var(--shake,.4) *  1px),  calc(var(--shake,.4) * -.8px)); }
+  }
+  @media (prefers-reduced-motion: reduce) { #stats .row .v.redline { animation: none; } }
   #stats hr { border: none; border-top: 1px solid rgba(143,233,255,.15); margin: 7px 0; }
   /* delta-v (fuel) bar */
   #fuelBar { position: relative; height: 10px; border: 1px solid rgba(143,233,255,.3); border-radius: 5px;

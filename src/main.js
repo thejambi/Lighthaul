@@ -199,6 +199,7 @@ const ship = {
 // (soft-capped) — length contraction made real.
 const PROPER_RATE = 0.4;
 const GAMMA_CAP = 40;
+const REDLINE_GAMMA = 2000;   // γ above which the HUD SPEED/Lorentz readouts go red + buzz
 
 // Effective speed cap. C_CAP is the stock governor; each Redline Coils level
 // shrinks the remaining gap to c by 10× (adds a nine), so top-throttle γ climbs
@@ -1537,6 +1538,14 @@ function updateHUD(gamma, dist, coordRate) {
   hud.pct.textContent = (pctC >= 99.99 ? fmt(pctC, 4) : fmt(pctC, 3)) + " %c";
   hud.beta.textContent = ship.beta.toFixed(ship.beta > 0.999 ? 7 : 6);
   hud.gamma.textContent = gamma > 1000 ? gamma.toExponential(2) : fmt(gamma, 4);
+  // redline payoff: past REDLINE_GAMMA the SPEED & Lorentz readouts glow red and
+  // buzz, harder the deeper into the redline you push
+  const redline = gamma > REDLINE_GAMMA;
+  const shake = redline ? Math.min(1.15, 0.4 + 0.28 * Math.log10(gamma / REDLINE_GAMMA)).toFixed(2) : 0;
+  for (const elm of [hud.pct, hud.gamma]) {
+    elm.classList.toggle("redline", redline);
+    if (redline) elm.style.setProperty("--shake", shake);
+  }
   const gl = game.contract && game.contract.gLimit;
   const over = gl && dyn.load > gl;
   hud.gforce.textContent = fmt(dyn.load, 1) + (gl ? " / " + gl + " g" : " g");

@@ -449,7 +449,38 @@ const _LC = ["b", "d", "g", "k", "l", "m", "n", "r", "s", "t", "v", "z"];
 const _LV = ["a", "e", "i", "o", "u"];
 const _LV1 = ["a", "e", "i", "o", "u", "ae", "ei", "ia", "au", "y"];
 const _LEND = ["n", "r", "s", "l", "x", "th", "is", "or", "yx"];
-const _SUFFIX = ["Station", "Port", "Relay", "Anchorage", "Hub", "Gate", "Depot", "Yards"];
+const _SUFFIX = [
+  "Station", 
+  "Port", 
+  "Relay", 
+  "Anchorage", 
+  "Hub", 
+  "Gate", 
+  "Depot", 
+  "Yards",
+  "Outpost",
+  "Citadel",
+  "Nexus",
+  "Terminal",
+  "Dock",
+  "Haven",
+  "Bastion",
+  "Platform",
+  "Array",
+  "Beacon",
+  "Sentinel",
+  "Forge",
+  "Spire",
+  "Ring",
+  "Core",
+  "Node",
+  "Stronghold",
+  "Enclave",
+  "Aerie",
+  "Perch",
+  "Vista",
+  "Orbital"
+];
 const _pick = (a) => a[(rng() * a.length) | 0];
 
 function coreName() {
@@ -969,7 +1000,7 @@ function buildShipStats() {
   // Owned-outfits legend: the same symbol each upgrade wears on the flight HUD
   // and in the dock's shop, so players learn what the badges mean.
   const ownedKeys = UP_KEYS.filter((k) => k === "autopilot" ? owned : u[k] > 0);
-  let outfitsHtml = '<div class="sc-outfit-hd">OUTFITS INSTALLED · the symbols you see in flight &amp; at the shop</div>';
+  let outfitsHtml = '<div class="sc-outfit-hd">OUTFITS INSTALLED</div>';
   if (!ownedKeys.length) {
     outfitsHtml += `<div class="sc-outfit-empty">None yet — buy outfits at any dock's OUTFITTING.</div>`;
   } else {

@@ -522,10 +522,17 @@ placeStations(randomSeed());   // an initial cluster so menus/test-flight work p
 // ---------------------------------------------------------------------------
 const CARGO = ["medical isotopes", "a cryo seed vault", "quantum cores", "antimatter cells",
   "archive crystals", "terraforming spores", "vaccine printers", "a reactor lattice",
-  "orbital tether spools", "heirloom soil"];
+  "orbital tether spools", "heirloom soil", "singularity ballast", "a caged plasma sun",
+  "prototype warp coils", "memory diamonds", "a bonsai biosphere", "salvaged AI cores",
+  "a monastery's relics", "self-replicating looms", "cryo-preserved coral", "living timber",
+  "a shard of a dead moon", "unlabeled medical vats", "a black-box flight recorder",
+  "gene-locked seed grain", "a whale in a tank", "contraband star charts"];
 const PAX = ["Dr. Imura", "Envoy Ashari", "the Kessler family", "a colonist cohort",
   "Magistrate Voss", "two exogeologists", "a stasis choir", "Capt. Rhee (ret.)",
-  "a diplomatic quartet", "the last archivist of Meridian"];
+  "a diplomatic quartet", "the last archivist of Meridian", "Ambassador Okonkwo",
+  "the Solari twins", "a pilgrim caravan", "a fugitive heiress", "a touring orchestra",
+  "three cryo-nauts", "a xenolinguist", "Dr. Vale and her live samples", "a newlywed couple",
+  "a witness in protective transit", "an off-world monk", "a delegation of terraformers"];
 
 function makeContracts(fromIdx) {
   const offers = [];
@@ -1615,7 +1622,7 @@ function update(dt) {
   // A warp burn spools β harder — and more so per Redline Coils level (2×…7×).
   // Gated on warpBurn so cutting thrust (Space) and speed presets (V) stay smooth
   // rather than snapping β and spiking felt G.
-  const spool = SPOOL * (warpBurn ? 1 + game.upgrades.overdrive : 1);
+  const spool = SPOOL * (warpBurn ? 1 + (game.upgrades.overdrive * 1.5) : 1);
   const targetBeta = throttleToBeta(ship.throttle);
   ship.beta += (targetBeta - ship.beta) * Math.min(1, dt * spool);
   const gamma = lorentz(ship.beta);

@@ -44,7 +44,7 @@ forfeits the contract and costs years of your life.
 Between runs you refuel and pick from three procedurally generated contracts.
 Pay scales with distance and how hard the job is (required speed or γ, plus a
 fragility premium for low-g cargo), and your **reputation** raises every
-contract's base pay as you rack up deliveries — +2% each, up to +50%, stacking
+contract's base pay as you rack up deliveries — +4% each, up to +75%, stacking
 on top of the Broker License. Fuel is priced per rapidity unit, with a **bulk
 discount** — the bigger the fill-up, the cheaper each unit (up to a third off).
 Since Δv is rapidity, brake fuel doesn't scale with tank size, so a big tank you

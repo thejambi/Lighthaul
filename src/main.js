@@ -573,7 +573,9 @@ function buildStation() {
     ` &nbsp;·&nbsp; Δv <b>${game.fuel.toFixed(1)}</b> / ${tankCap()}` +
     ` &nbsp;·&nbsp; deliveries <b>${game.deliveries}</b>`;
 
-  el("st-seed").textContent = "seed " + worldSeed;
+  const seedBtn = el("st-seed");
+  seedBtn.textContent = "seed " + worldSeed + " · tap to copy";
+  seedBtn.classList.remove("copied");
   el("st-debug").style.display = game.debug ? "" : "none";
 
   el("st-ship").innerHTML =
@@ -667,6 +669,23 @@ el("st-refuel").addEventListener("click", () => {
   buildStation();
 });
 el("st-retire").addEventListener("click", () => setPhase("over"));
+
+// copy the current map seed to the clipboard so a good cluster can be replayed
+el("st-seed").addEventListener("click", () => {
+  const btn = el("st-seed");
+  const done = () => { btn.textContent = "seed " + worldSeed + " · copied ✓"; btn.classList.add("copied"); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(worldSeed).then(done, fallbackCopy);
+    else fallbackCopy();
+  } catch (_) { fallbackCopy(); }
+  function fallbackCopy() {                      // execCommand path for non-secure contexts
+    const ta = document.createElement("textarea");
+    ta.value = worldSeed; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (_) {}
+    document.body.removeChild(ta); done();
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Star chart — the dock's contract browser & trip planner, rendered inside the

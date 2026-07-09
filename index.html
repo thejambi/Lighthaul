@@ -307,13 +307,19 @@
   #seed-input::placeholder { color: var(--hud-dim); opacity: .7; }
   .seed-note { opacity: .8; }
 
-  /* dock seed + debug chips */
-  .dock-meta { display: flex; align-items: center; gap: 8px; margin: -2px 0 8px; }
-  .seed-chip { font-size: 10px; letter-spacing: 1px; color: var(--hud-dim);
-    border: 1px solid rgba(143,233,255,.2); border-radius: 10px; padding: 2px 9px; text-transform: uppercase; }
+  /* dock debug chip (top) + seed chip (footer, click to copy) */
+  .dock-meta:not(:empty) { display: flex; align-items: center; gap: 8px; margin: -2px 0 8px; }
   .debug-chip { font-size: 10px; letter-spacing: 1.5px; color: var(--gold);
     border: 1px solid rgba(255,215,106,.5); border-radius: 10px; padding: 2px 9px;
     background: rgba(255,215,106,.1); }
+  .dock-foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(143,233,255,.12);
+    text-align: center; }
+  .seed-chip { font: inherit; font-size: 10px; letter-spacing: 1px; color: var(--hud-dim);
+    background: rgba(0,0,0,.25); border: 1px solid rgba(143,233,255,.2); border-radius: 10px;
+    padding: 4px 12px; text-transform: uppercase; cursor: pointer; pointer-events: auto;
+    transition: color .15s, border-color .15s, background .15s; }
+  .seed-chip:hover { color: var(--hud); border-color: rgba(143,233,255,.5); background: rgba(8,20,28,.5); }
+  .seed-chip.copied { color: var(--gold); border-color: rgba(255,215,106,.5); background: rgba(255,215,106,.1); }
 
   /* debug teleport control in the trip planner */
   .dbg-line { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
@@ -463,7 +469,7 @@
   <div id="station" class="screen hiddenS">
     <div class="card" style="max-width:720px">
       <h2 id="st-name">Station</h2>
-      <div class="dock-meta"><span id="st-seed" class="seed-chip"></span><span id="st-debug" class="debug-chip" style="display:none">◈ DEBUG</span></div>
+      <div class="dock-meta"><span id="st-debug" class="debug-chip" style="display:none">◈ DEBUG</span></div>
       <div class="stat-line" id="st-stats"></div>
       <div id="st-ship"></div>
       <div id="st-lowfuel" class="lowfuel" style="display:none"></div>
@@ -484,6 +490,7 @@
       </div>
       <p style="margin-top:12px; font-size:11px">Accepting a contract undocks you with a frozen <b>10-second</b> window to find and aim at the target (thrust to launch early).
          Cut throttle in time — you dock below <b>0.20c</b> within <b>15 ly</b>. The <b>TOW</b> button (or <b>R</b>) recovers you if you're stranded.</p>
+      <div class="dock-foot"><button id="st-seed" class="seed-chip" title="Copy map seed to clipboard"></button></div>
     </div>
   </div>
 

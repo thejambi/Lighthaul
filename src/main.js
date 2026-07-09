@@ -577,6 +577,7 @@ function fmtGamma(g) { return Math.round(g).toLocaleString(); }
 
 function buildStation() {
   const s = stations[game.station];
+  resetRetire();                          // clear any armed "confirm retire" on a fresh render
   el("st-name").textContent = "Docked · " + s.name;
   el("st-stats").innerHTML =
     `pilot age <b>${game.pilotAge.toFixed(1)}</b> / retires ${retireAge()}` +
@@ -679,7 +680,25 @@ el("st-refuel").addEventListener("click", () => {
   game.credits -= Math.ceil(affordable * unit);
   buildStation();
 });
-el("st-retire").addEventListener("click", () => setPhase("over"));
+// retiring ends the career, so it takes a confirming second tap (auto-disarms
+// after a few seconds, and any dock re-render resets it)
+let retireArmed = false, retireTimer = null;
+function resetRetire() {
+  retireArmed = false;
+  clearTimeout(retireTimer);
+  const b = el("st-retire");
+  b.textContent = "RETIRE NOW";
+  b.classList.remove("armed");
+}
+el("st-retire").addEventListener("click", () => {
+  if (retireArmed) { resetRetire(); setPhase("over"); return; }
+  retireArmed = true;
+  const b = el("st-retire");
+  b.textContent = "CONFIRM RETIRE?";
+  b.classList.add("armed");
+  clearTimeout(retireTimer);
+  retireTimer = setTimeout(resetRetire, 3000);
+});
 
 // copy the current map seed to the clipboard so a good cluster can be replayed
 el("st-seed").addEventListener("click", () => {
@@ -1052,9 +1071,11 @@ el("rs-continue").addEventListener("click", () => {
 
 function buildGameOver() {
   const forced = game.pilotAge >= retireAge();
-  // commit exactly once per career (setPhase("over") only fires on a real
-  // transition, but guard anyway so a re-render can't double-count)
-  const beat = game._recorded ? { balance: false, earned: false, deliveries: false } : commitCareer();
+  // A debug career is a play-test, so it never touches the saved records.
+  // Otherwise commit exactly once per career (setPhase("over") only fires on a
+  // real transition, but guard anyway so a re-render can't double-count).
+  const noRecord = { balance: false, earned: false, deliveries: false, gamma: false };
+  const beat = (game.debug || game._recorded) ? noRecord : commitCareer();
   game._recorded = true;
   updateTitleRecords();
   const star = (on) => on ? ` <span class="rec-new">★ record</span>` : "";
@@ -1069,9 +1090,10 @@ function buildGameOver() {
     `peak <b>γ ${fmtGamma(game.maxGamma)}</b>${star(beat.gamma)}<br/>` +
     `Career earnings <b class="gold-t">₡${game.earned}</b>${star(beat.earned)} · ` +
     `final balance <b class="gold-t">₡${game.credits}</b>${star(beat.balance)}` +
+    (game.debug ? `<div class="alltime">◈ debug career — not recorded</div>` :
     `<div class="alltime">— all-time —&nbsp; richest retirement <b class="gold-t">₡${records.bestBalance}</b>` +
     ` · most deliveries <b>${records.mostDeliveries}</b> · top <b>γ ${fmtGamma(records.topGamma)}</b>` +
-    ` · careers flown <b>${records.careers}</b></div>`;
+    ` · careers flown <b>${records.careers}</b></div>`);
 }
 el("go-new").addEventListener("click", () => location.reload());
 

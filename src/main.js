@@ -53,6 +53,8 @@ const DOCK_BETA = 0.2;
 const THRUST_RATE = 0.14;   // base throttle change per second (W/S, ↑/↓)
 const TURBO_X = 4;          // Shift multiplier — "turbo thrust"
 const WARP_X = 9;           // X multiplier — "warp thrust", unlocked by Redline Coils
+const SPOOL = 2.5;          // drive response: how fast β chases the throttle setting
+const WARP_SPOOL = 4.4;     // a warp burn spools β harder — faster real accel, higher felt G
 const AP_DECEL = 0.14;      // autopilot throttle-down rate = the S-key rate
 const PREFLIGHT = 10;       // seconds after undock: clock frozen, aim at the target (or thrust to launch early)
 const AIM_RATE = 2.2;       // autopilot slerp rate onto the target heading (per second)
@@ -237,7 +239,7 @@ function apBrakeDistance(beta0) {
   const h = 0.05;                       // integration step (= the game's dt cap)
   for (let i = 0; i < 2000 && beta > DOCK_BETA; i++) {
     throttle = Math.max(0, throttle - AP_DECEL * h);
-    beta += (throttleToBeta(throttle) - beta) * Math.min(1, h * 2.5);
+    beta += (throttleToBeta(throttle) - beta) * Math.min(1, h * SPOOL);
     const gc = gammaCap();
     const gp = gc * Math.tanh(lorentz(beta) / gc);
     dist += beta * PROPER_RATE * gp * h;
@@ -1474,6 +1476,9 @@ function update(dt) {
   if (keys.has("KeyW") || keys.has("ArrowUp")) ship.throttle += rate * dt;
   if (keys.has("KeyS") || keys.has("ArrowDown")) ship.throttle -= rate * dt;
   if (touchThrottleRate) ship.throttle += touchThrottleRate * thr * dt; // held thrust-bar zone
+  // a warp burn (keyboard X, or the warp thrust-bar band) also spools the drive
+  // harder below, so the speed itself climbs faster — not just the lever
+  const warpBurn = warpKey || Math.abs(touchThrottleRate) > 1.0;
   if (keys.has("Space")) ship.throttle = 0;
   ship.throttle = Math.max(0, Math.min(1, ship.throttle));
 
@@ -1551,7 +1556,7 @@ function update(dt) {
 
   // --- speed easing + FUEL: burn |Δrapidity| (proper Δv of the maneuver) ---
   const targetBeta = throttleToBeta(ship.throttle);
-  ship.beta += (targetBeta - ship.beta) * Math.min(1, dt * 2.5);
+  ship.beta += (targetBeta - ship.beta) * Math.min(1, dt * (warpBurn ? WARP_SPOOL : SPOOL));
   const gamma = lorentz(ship.beta);
   const phi = rapidity(ship.beta);
   const dphi = Math.abs(phi - dyn.prevPhi);

@@ -1593,8 +1593,12 @@ function update(dt) {
   }
 
   // --- speed easing + FUEL: burn |Δrapidity| (proper Δv of the maneuver) ---
+  // A warp burn spools β harder — and more so per Redline Coils level (2×…7×).
+  // Gated on warpBurn so cutting thrust (Space) and speed presets (V) stay smooth
+  // rather than snapping β and spiking felt G.
+  const spool = SPOOL * (warpBurn ? 1 + game.upgrades.overdrive : 1);
   const targetBeta = throttleToBeta(ship.throttle);
-  ship.beta += (targetBeta - ship.beta) * Math.min(1, dt * (SPOOL * (game.upgrades.overdrive + 1)));
+  ship.beta += (targetBeta - ship.beta) * Math.min(1, dt * spool);
   const gamma = lorentz(ship.beta);
   if (!game.testFlight && gamma > game.maxGamma) game.maxGamma = gamma;   // career peak γ (a record)
   const phi = rapidity(ship.beta);

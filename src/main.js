@@ -55,7 +55,7 @@ const TURBO_X = 4;          // Shift multiplier — "turbo thrust"
 const WARP_X = 9;           // X multiplier — "warp thrust", unlocked by Redline Coils
 const SPOOL = 2.5;          // drive response: how fast β chases the throttle setting. (Multiplied by Redline Coils level + 1 for warp burn.)
 const AP_DECEL = 0.14;      // autopilot throttle-down rate floor = the S-key rate
-const AP_BRAKE_G = 0.7;     // autopilot brakes up to this fraction of the cargo's g-rating
+const AP_BRAKE_G = 0.85;    // autopilot brakes up to this fraction of the cargo's g-rating
 const PREFLIGHT = 10;       // seconds after undock: clock frozen, aim at the target (or thrust to launch early)
 const AIM_RATE = 2.2;       // autopilot slerp rate onto the target heading (per second)
 const DRAG_SENS = 0.004;    // radians of turn per pixel dragged (before ship handling)

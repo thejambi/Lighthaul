@@ -53,8 +53,7 @@ const DOCK_BETA = 0.2;
 const THRUST_RATE = 0.14;   // base throttle change per second (W/S, ↑/↓)
 const TURBO_X = 4;          // Shift multiplier — "turbo thrust"
 const WARP_X = 9;           // X multiplier — "warp thrust", unlocked by Redline Coils
-const SPOOL = 2.5;          // drive response: how fast β chases the throttle setting
-const WARP_SPOOL = 5.6;     // a warp burn spools β harder — faster real accel, higher felt G. Original value 4.4.
+const SPOOL = 2.5;          // drive response: how fast β chases the throttle setting. (Multiplied by Redline Coils level + 1 for warp burn.)
 const AP_DECEL = 0.14;      // autopilot throttle-down rate = the S-key rate
 const PREFLIGHT = 10;       // seconds after undock: clock frozen, aim at the target (or thrust to launch early)
 const AIM_RATE = 2.2;       // autopilot slerp rate onto the target heading (per second)
@@ -1595,7 +1594,7 @@ function update(dt) {
 
   // --- speed easing + FUEL: burn |Δrapidity| (proper Δv of the maneuver) ---
   const targetBeta = throttleToBeta(ship.throttle);
-  ship.beta += (targetBeta - ship.beta) * Math.min(1, dt * (warpBurn ? WARP_SPOOL : SPOOL));
+  ship.beta += (targetBeta - ship.beta) * Math.min(1, dt * (SPOOL * (game.upgrades.overdrive + 1)));
   const gamma = lorentz(ship.beta);
   if (!game.testFlight && gamma > game.maxGamma) game.maxGamma = gamma;   // career peak γ (a record)
   const phi = rapidity(ship.beta);

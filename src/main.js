@@ -69,7 +69,7 @@ const UPGRADES = {
   damper:    { icon: "◇", name: "Inertial Dampers", desc: "−15% felt maneuvering load",  costs: [260, 420, 600] },
   broker:    { icon: "✦", name: "Broker License",   desc: "+8% pay on every contract",   costs: [280, 460, 640] },
   rejuv:     { icon: "✚", name: "Rejuv Course",      desc: "+6 yr before retirement",     costs: [300, 460, 640, 840] },
-  overdrive: { icon: "»", name: "Redline Coils",    desc: "top speed a 9 nearer c — more γ, less aging", costs: [400, 720, 1150, 1700, 2400, 3300] },
+  overdrive: { icon: "»", name: "Redline Coils",    desc: "a 9 nearer c — faster legs & less aging", costs: [400, 720, 1150, 1700, 2400, 3300] },
   autopilot: { icon: "◈", name: "Docking Assist",   desc: "auto-brakes to a clean dock", costs: [500], oneShot: true },
 };
 
@@ -208,6 +208,12 @@ const REDLINE_GAMMA = 2000;   // γ above which the HUD SPEED/Lorentz readouts g
 // and γ/rapidity blow up to Infinity. Level 6 sits right at that floor.
 function capBeta() { return Math.min(1 - 5e-13, 1 - (1 - C_CAP) * Math.pow(10, -game.upgrades.overdrive)); }
 
+// The pilot-frame pacing softcap also lifts with each Redline Coils level, so
+// redline legs actually cover ground faster in real time (≈ PROPER_RATE·gammaCap
+// ly/s at saturation) — NOT just age less. Aging (d/βγ) and universe time (d/β)
+// fall out independent of gammaCap, so this only speeds the wall-clock journey.
+function gammaCap() { return GAMMA_CAP * (1 + 0.25 * game.upgrades.overdrive); }
+
 function throttleToBeta(t) {
   t = Math.max(0, Math.min(1, t));
   return Math.min(1 - Math.pow(1 - t, 3), capBeta());
@@ -228,7 +234,8 @@ function apBrakeDistance(beta0) {
   for (let i = 0; i < 2000 && beta > DOCK_BETA; i++) {
     throttle = Math.max(0, throttle - AP_DECEL * h);
     beta += (throttleToBeta(throttle) - beta) * Math.min(1, h * 2.5);
-    const gp = GAMMA_CAP * Math.tanh(lorentz(beta) / GAMMA_CAP);
+    const gc = gammaCap();
+    const gp = gc * Math.tanh(lorentz(beta) / gc);
     dist += beta * PROPER_RATE * gp * h;
   }
   return dist;
@@ -1446,7 +1453,8 @@ function update(dt) {
   const tgt = c ? stations[c.to] : null;
   let dCoord = 0;
   if (!launching) {
-    const gPace = GAMMA_CAP * Math.tanh(gamma / GAMMA_CAP);
+    const gc = gammaCap();
+    const gPace = gc * Math.tanh(gamma / gc);
     dCoord = PROPER_RATE * gPace * dt;
     ship.pos.addScaledVector(_fwd, ship.beta * dCoord);
     if (!game.testFlight) {                     // test flight doesn't burn the career clock

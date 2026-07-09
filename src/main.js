@@ -50,6 +50,9 @@ const FUEL_MAX_DISC = 0.35;  // ...capped here. Big fills (a large tank run low)
 const LOW_FUEL = 6;          // Δv below which the dock nags you to refuel (see buildStation)
 const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
+const THRUST_RATE = 0.14;   // base throttle change per second (W/S, ↑/↓)
+const TURBO_X = 4;          // Shift multiplier — "turbo thrust"
+const WARP_X = 9;           // X multiplier — "warp thrust", unlocked by Redline Coils
 const AP_DECEL = 0.14;      // autopilot throttle-down rate = the S-key rate
 const PREFLIGHT = 10;       // seconds after undock: clock frozen, aim at the target (or thrust to launch early)
 const AIM_RATE = 2.2;       // autopilot slerp rate onto the target heading (per second)
@@ -919,6 +922,7 @@ function startTestFlight(clsKey, returnScreen) {
   dyn.prevBeta = 0; dyn.prevPhi = 0; dyn.load = 0;
   av.yaw = av.pitch = av.roll = 0; dragYaw = dragPitch = 0; aimStation = null;
   apBraking = false;
+  refreshWarpZones();
   el("tf-name").textContent = shipCls().name;
   el("testBanner").style.display = "flex";
   closeShip();
@@ -1198,6 +1202,7 @@ function updateBadges() {
       .map((k) => `${UPGRADES[k].icon}<span class="rl">${ROMAN[game.upgrades[k]]}</span>`)
       .join("<span class='bsep'>·</span>");
   }
+  refreshWarpZones();          // warp thrust zones follow Redline Coils ownership
 }
 let eggToastTimer = null;
 function showEggToast(text) {
@@ -1258,19 +1263,31 @@ el("targetArrow").addEventListener("click", () => {
 
 // throttle bar drag
 // Press-and-hold zones on the thrust bar ramp the throttle while held (like
-// W / Shift+W), instead of jumping to the tapped position — precise on touch.
-// Zones top→bottom: turbo-up (0–15%), up (15–50%), down (50–85%), turbo-down.
+// W / Shift+W / X+W), instead of jumping to the tapped position — precise on
+// touch. Zones top→bottom: [warp-up] turbo-up, up, down, turbo-down [warp-down].
+// The triple-arrow warp zones only appear once Redline Coils are owned.
 const throttleBarEl = el("throttleBar");
 let throttleHeld = false;
 let touchThrottleRate = 0;   // signed throttle delta per second from the held zone
 let activeZoneEl = null;
+// mirror the warp zones onto the bar when the drive can reach redline
+function refreshWarpZones() { throttleBarEl.classList.toggle("warp", game.upgrades.overdrive > 0); }
 function zoneFromPointer(clientY) {
   const r = throttleBarEl.getBoundingClientRect();
   const frac = (clientY - r.top) / r.height;   // 0 = top, 1 = bottom
-  if (frac < 0.15) return [0.56, ".tz-uu"];
-  if (frac < 0.50) return [0.14, ".tz-u"];
-  if (frac < 0.85) return [-0.14, ".tz-d"];
-  return [-0.56, ".tz-dd"];
+  const turbo = THRUST_RATE * TURBO_X, warp = THRUST_RATE * WARP_X;
+  if (game.upgrades.overdrive > 0) {           // 6 zones: warp | turbo | fine, each way
+    if (frac < 0.12) return [warp, ".tz-uuu"];
+    if (frac < 0.25) return [turbo, ".tz-uu"];
+    if (frac < 0.50) return [THRUST_RATE, ".tz-u"];
+    if (frac < 0.75) return [-THRUST_RATE, ".tz-d"];
+    if (frac < 0.88) return [-turbo, ".tz-dd"];
+    return [-warp, ".tz-ddd"];
+  }
+  if (frac < 0.15) return [turbo, ".tz-uu"];
+  if (frac < 0.50) return [THRUST_RATE, ".tz-u"];
+  if (frac < 0.85) return [-THRUST_RATE, ".tz-d"];
+  return [-turbo, ".tz-dd"];
 }
 function setZone(clientY) {
   const [rate, sel] = zoneFromPointer(clientY);
@@ -1447,11 +1464,13 @@ function frame(now) {
 }
 
 function update(dt) {
-  // --- throttle keys (fine default, Shift turbo). Per-ship responsiveness: nimble
-  // hulls spin the drive up/down fast, heavy hulls are sluggish (shares handling).
-  const turbo = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 4 : 1;
+  // --- throttle keys: fine default, Shift = turbo, X = warp (Redline Coils only,
+  // even faster than turbo). Per-ship responsiveness: nimble hulls spin the drive
+  // up/down fast, heavy hulls are sluggish (shares handling).
+  const warpKey = keys.has("KeyX") && game.upgrades.overdrive > 0;
+  const mult = warpKey ? WARP_X : (keys.has("ShiftLeft") || keys.has("ShiftRight")) ? TURBO_X : 1;
   const thr = shipCls().handling;
-  const rate = 0.14 * turbo * thr;
+  const rate = THRUST_RATE * mult * thr;
   if (keys.has("KeyW") || keys.has("ArrowUp")) ship.throttle += rate * dt;
   if (keys.has("KeyS") || keys.has("ArrowDown")) ship.throttle -= rate * dt;
   if (touchThrottleRate) ship.throttle += touchThrottleRate * thr * dt; // held thrust-bar zone

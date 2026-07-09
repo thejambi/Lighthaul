@@ -87,7 +87,7 @@ replay the exact same cluster — same stations, layout, and outfit shops.
 | Input | Action |
 | --- | --- |
 | **Mouse** (drag) | steer — pitch & yaw |
-| **W / S** | throttle up / down (fine); **Shift** = turbo |
+| **W / S** | throttle up / down (fine); **Shift** = turbo; **X** = warp (needs Redline Coils) |
 | **Q / E** | roll |
 | **Space** | cut thrust |
 | **V** | cycle speed presets (0 → 0.5c → 0.9c → 0.99c → 0.9999c) |

@@ -116,12 +116,23 @@
   .tz { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: center;
     color: rgba(191,239,255,.55); font-size: 9px; letter-spacing: 1px; line-height: 1; pointer-events: none;
     text-shadow: 0 0 4px rgba(0,0,0,.9); }
+  /* default (no Redline Coils): 4 zones, warp hidden */
+  .tz-uuu, .tz-ddd { display: none; }
   .tz-uu { top: 0; height: 15%; }
   .tz-u  { top: 15%; height: 35%; }
   .tz-d  { top: 50%; height: 35%; }
   .tz-dd { top: 85%; height: 15%; }
   .tz.active { color: #fff; background: rgba(143,233,255,.28); }
   .tz-uu, .tz-dd { color: var(--gold); }          /* turbo zones */
+  /* Redline Coils owned: 6 zones with a warp band at each extreme */
+  #throttleBar.warp .tz-uuu { display: flex; top: 0;   height: 12%; }
+  #throttleBar.warp .tz-uu  { top: 12%; height: 13%; }
+  #throttleBar.warp .tz-u   { top: 25%; height: 25%; }
+  #throttleBar.warp .tz-d   { top: 50%; height: 25%; }
+  #throttleBar.warp .tz-dd  { top: 75%; height: 13%; }
+  #throttleBar.warp .tz-ddd { display: flex; top: 88%; height: 12%; }
+  #throttleBar.warp .tz-uuu, #throttleBar.warp .tz-ddd {  /* warp bands: hotter than gold turbo */
+    color: #fff; font-size: 8px; letter-spacing: 0; text-shadow: 0 0 6px var(--warn); }
   #throttleWrap .pct { font-size: 11px; margin-top: 6px; color: var(--hud); }
 
   /* touch action buttons — desktop hides these (keyboard R / M cover them) */
@@ -566,10 +577,12 @@
       <div class="label">THRUST</div>
       <div id="throttleBar">
         <div id="throttleFill"></div>
+        <div class="tz tz-uuu">▲▲▲</div>
         <div class="tz tz-uu">▲▲</div>
         <div class="tz tz-u">▲</div>
         <div class="tz tz-d">▼</div>
         <div class="tz tz-dd">▼▼</div>
+        <div class="tz tz-ddd">▼▼▼</div>
       </div>
       <div class="pct" id="throttlePct">0%</div>
     </div>
@@ -592,7 +605,7 @@
 
     <div id="help" class="panel">
       <div class="title">FLIGHT CONTROLS</div>
-      <b>Mouse</b> steer (drag) · <b>tap</b> a marker to auto-aim · <b>W/S</b> throttle ± · <b>Q/E</b> roll · <b>Shift</b> turbo<br/>
+      <b>Mouse</b> steer (drag) · <b>tap</b> a marker to auto-aim · <b>W/S</b> throttle ± · <b>Q/E</b> roll · <b>Shift</b> turbo · <b>X</b> warp<br/>
       <b>Space</b> cut thrust · <b>V</b> speed presets · <b>B</b> (hold) look astern<br/>
       <b>R</b> call tow · <b>M</b> mute · <b>H</b> hide UI · <b>1–5</b> toggle effects
     </div>

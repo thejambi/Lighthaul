@@ -1080,7 +1080,7 @@ function buildResults() {
   } else {
     el("rs-title").textContent = r.ok ? "Delivery complete ✓" : "Delivery botched";
     el("rs-body").innerHTML =
-      `<b>${r.c.type === "cargo" ? r.c.what : r.c.what}</b> → <b>${stations[r.c.to].name}</b><br/>` +
+      `<b>${r.c.what}</b> → <b>${stations[r.c.to].name}</b><br/>` +
       `universe time used <b>${fmtY(r.usedCoord)}</b> (deadline ${fmtY(r.c.deadline)})<br/>` +
       `ship time aboard <b>${r.usedShip.toFixed(2)} yr</b>` +
       (r.c.type === "passenger" ? ` (limit ${r.c.maxAging.toFixed(1)} yr)` : "") + `<br/>` +

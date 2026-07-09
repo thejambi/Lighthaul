@@ -42,10 +42,13 @@ you had, unable to brake — and your only option is an expensive tow (**R**) th
 forfeits the contract and costs years of your life.
 
 Between runs you refuel and pick from three procedurally generated contracts.
-Fuel is priced per rapidity unit, with a **bulk discount** — the bigger the
-fill-up, the cheaper each unit (up to a third off). Since Δv is rapidity, brake
-fuel doesn't scale with tank size, so a big tank you let run low before topping
-off buys the cheapest fuel. Retire rich, not old.
+Pay scales with distance and how hard the job is (required speed or γ, plus a
+fragility premium for low-g cargo), and your **reputation** raises every
+contract's base pay as you rack up deliveries — +2% each, up to +50%, stacking
+on top of the Broker License. Fuel is priced per rapidity unit, with a **bulk
+discount** — the bigger the fill-up, the cheaper each unit (up to a third off).
+Since Δv is rapidity, brake fuel doesn't scale with tank size, so a big tank you
+let run low before topping off buys the cheapest fuel. Retire rich, not old.
 
 **Outfitting.** Every dock stocks a fixed pair of upgrades, so the map is worth
 learning — you travel to where the outfit you want is sold. Each buys up in a

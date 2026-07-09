@@ -48,6 +48,8 @@ const FUEL_PRICE = 20;       // base credits per rapidity unit (before bulk disc
 const FUEL_BULK_DISC = 0.02; // discount per Δv unit in the fill-up...
 const FUEL_MAX_DISC = 0.35;  // ...capped here. Big fills (a large tank run low) are cheapest.
 const LOW_FUEL = 6;          // Δv below which the dock nags you to refuel (see buildStation)
+const REP_PER_DELIVERY = 0.02; // contract pay ramps +2% per successful delivery (reputation)...
+const REP_MAX = 0.5;         // ...capped at +50%, a built-in raise atop the Broker License
 const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
 const THRUST_RATE = 0.14;   // base throttle change per second (W/S, ↑/↓)
@@ -270,8 +272,9 @@ function tankCap()   { return shipCls().tank + game.upgrades.tank * 3; }        
 function retireAge() { return RETIRE_AGE + game.upgrades.rejuv * 6; }                 // career length (pilot, not ship)
 function loadFactor(){ return shipCls().damper * (1 - game.upgrades.damper * 0.15); } // felt maneuvering load ×
 function fuelFactor(){ return shipCls().fuelEff * (1 - game.upgrades.drive * 0.12); } // fuel burned ×
-function payMult()   { return 1 + game.upgrades.broker * 0.08; }        // contract pay ×
-function contractPay(c) { return Math.round(c.pay * payMult()); }
+function payMult()   { return 1 + game.upgrades.broker * 0.08; }        // contract pay × (Broker License)
+function repMult()   { return 1 + Math.min(game.deliveries * REP_PER_DELIVERY, REP_MAX); } // reputation ramp
+function contractPay(c) { return Math.round(c.pay * payMult() * repMult()); }
 
 // bulk fuel discount: the per-Δv price drops with the size of the fill-up. Δv is
 // rapidity, so brake fuel is capacity-independent — a big tank you let run low
@@ -595,7 +598,8 @@ function buildStation() {
     `pilot age <b>${game.pilotAge.toFixed(1)}</b> / retires ${retireAge()}` +
     ` &nbsp;·&nbsp; credits <b class="gold-t">₡${game.credits}</b>` +
     ` &nbsp;·&nbsp; Δv <b>${game.fuel.toFixed(1)}</b> / ${tankCap()}` +
-    ` &nbsp;·&nbsp; deliveries <b>${game.deliveries}</b>`;
+    ` &nbsp;·&nbsp; deliveries <b>${game.deliveries}</b>` +
+    (repMult() > 1 ? ` <span class="gold-t">(+${Math.round((repMult() - 1) * 100)}% rep pay)</span>` : "");
 
   const seedBtn = el("st-seed");
   seedBtn.textContent = "seed " + worldSeed + " · tap to copy";
@@ -933,8 +937,9 @@ function buildShipStats() {
     row("handling", mult(c.handling), "turn & throttle response", q(c.handling, false)) +
     row("top speed", "γ ≤ " + Math.round(lorentz(capBeta())).toLocaleString(),
       u.overdrive ? `redline ×${u.overdrive} — nearer c` : "stock governor", u.overdrive ? "good" : "") +
-    row("contract pay", "×" + payMult().toFixed(2),
-      u.broker ? `broker +${u.broker * 8}%` : "no broker license", q(payMult(), false)) +
+    row("contract pay", "×" + (payMult() * repMult()).toFixed(2),
+      `${u.broker ? `broker +${u.broker * 8}%` : "no broker"} · reputation +${Math.round((repMult() - 1) * 100)}%`,
+      q(payMult() * repMult(), false)) +
     row("retires at", retireAge().toFixed(0),
       u.rejuv ? `base ${RETIRE_AGE} + ${u.rejuv * 6} · rejuv` : `base ${RETIRE_AGE}`) +
     row("docking assist", owned ? "installed" : "—", owned ? "auto-brakes to a clean dock" : "");

@@ -920,6 +920,21 @@ el("map-speeds").addEventListener("click", (e) => {
 function openShip() { buildShipStats(); el("shipcard").classList.remove("hiddenS"); }
 function closeShip() { el("shipcard").classList.add("hiddenS"); }
 
+// The current cumulative effect of an owned outfit, for the ship-stats legend.
+function outfitEffect(k) {
+  const u = game.upgrades;
+  switch (k) {
+    case "tank":      return `+${u.tank * 3} Δv capacity`;
+    case "drive":     return `−${u.drive * 12}% fuel burned`;
+    case "damper":    return `−${u.damper * 15}% felt load`;
+    case "broker":    return `+${u.broker * 8}% contract pay`;
+    case "rejuv":     return `+${u.rejuv * 6} yr before retirement`;
+    case "overdrive": return `top speed ${u.overdrive} nine${u.overdrive > 1 ? "s" : ""} nearer c`;
+    case "autopilot": return "auto-brakes you to a clean dock";
+  }
+  return "";
+}
+
 function buildShipStats() {
   const c = shipCls(), u = game.upgrades;
   el("shipcard-art").innerHTML = SHIP_ART[game.cls];
@@ -950,6 +965,26 @@ function buildShipStats() {
     row("retires at", retireAge().toFixed(0),
       u.rejuv ? `base ${RETIRE_AGE} + ${u.rejuv * 6} · rejuv` : `base ${RETIRE_AGE}`) +
     row("docking assist", owned ? "installed" : "—", owned ? "auto-brakes to a clean dock" : "");
+
+  // Owned-outfits legend: the same symbol each upgrade wears on the flight HUD
+  // and in the dock's shop, so players learn what the badges mean.
+  const ownedKeys = UP_KEYS.filter((k) => k === "autopilot" ? owned : u[k] > 0);
+  let outfitsHtml = '<div class="sc-outfit-hd">OUTFITS INSTALLED · the symbols you see in flight &amp; at the shop</div>';
+  if (!ownedKeys.length) {
+    outfitsHtml += `<div class="sc-outfit-empty">None yet — buy outfits at any dock's OUTFITTING.</div>`;
+  } else {
+    outfitsHtml += ownedKeys.map((k) => {
+      const up = UPGRADES[k], lv = k === "autopilot" ? 1 : u[k], max = up.costs.length;
+      let pips = "";
+      if (!up.oneShot) for (let i = 0; i < max; i++) pips += `<span class="pip ${i < lv ? "on" : ""}"></span>`;
+      const lvChip = up.oneShot ? "" : `<span class="sc-olv">${ROMAN[lv]}</span>`;
+      return `<div class="sc-outfit"><span class="sc-oi">${up.icon}</span>` +
+        `<span class="sc-om"><span class="sc-onm"><b>${up.name}</b>${lvChip}</span>` +
+        `<span class="sc-oe">${outfitEffect(k)}</span></span>` +
+        `<span class="pips">${pips}</span></div>`;
+    }).join("");
+  }
+  el("shipcard-outfits").innerHTML = outfitsHtml;
 }
 
 el("st-ship").addEventListener("click", openShip);

@@ -291,6 +291,20 @@
   .sc-val { color: #fff; font-variant-numeric: tabular-nums; letter-spacing: .3px; }
   .sc-val.good { color: var(--ok); } .sc-val.bad { color: var(--gold); }
   .sc-note { color: var(--hud-dim); font-size: 11px; }
+  /* owned-outfits legend (teaches the flight/shop symbols) */
+  #shipcard-outfits { margin-top: 16px; }
+  .sc-outfit-hd { font-size: 11px; letter-spacing: 1.5px; color: var(--hud-dim); margin-bottom: 8px;
+    border-top: 1px solid rgba(143,233,255,.15); padding-top: 12px; }
+  .sc-outfit-empty { font-size: 12px; color: var(--hud-dim); }
+  .sc-outfit { display: flex; align-items: center; gap: 12px; padding: 7px 11px; margin: 6px 0;
+    border: 1px solid rgba(143,233,255,.18); border-radius: 8px; background: rgba(0,0,0,.22); }
+  .sc-oi { font-size: 20px; color: var(--gold); width: 22px; text-align: center; flex: none;
+    text-shadow: 0 0 8px rgba(255,215,106,.45); }
+  .sc-om { flex: 1; min-width: 0; }
+  .sc-onm { font-size: 13px; color: #fff; }
+  .sc-olv { font-size: 9px; color: var(--gold); letter-spacing: 1px; margin-left: 5px; vertical-align: super; }
+  .sc-oe { display: block; font-size: 11px; color: var(--hud-dim); margin-top: 1px; }
+  .sc-outfit .pips { flex: none; margin-left: 0; }
 
   /* ship-class select */
   #class-list { display: flex; flex-wrap: wrap; gap: 12px; }
@@ -518,6 +532,7 @@
       </div>
       <div class="stat-line" style="margin:0 0 10px">Your ship's current performance — base hull plus every upgrade you own.</div>
       <div id="shipcard-stats"></div>
+      <div id="shipcard-outfits"></div>
       <div style="margin-top:14px">
         <button class="btn" id="shipcard-back">◂ BACK TO DOCK</button>
         <button class="btn gold" id="shipcard-test">▸ TEST FLIGHT</button>

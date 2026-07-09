@@ -54,7 +54,7 @@ const THRUST_RATE = 0.14;   // base throttle change per second (W/S, ↑/↓)
 const TURBO_X = 4;          // Shift multiplier — "turbo thrust"
 const WARP_X = 9;           // X multiplier — "warp thrust", unlocked by Redline Coils
 const SPOOL = 2.5;          // drive response: how fast β chases the throttle setting
-const WARP_SPOOL = 4.4;     // a warp burn spools β harder — faster real accel, higher felt G
+const WARP_SPOOL = 5.4;     // a warp burn spools β harder — faster real accel, higher felt G. Original value 4.4.
 const AP_DECEL = 0.14;      // autopilot throttle-down rate = the S-key rate
 const PREFLIGHT = 10;       // seconds after undock: clock frozen, aim at the target (or thrust to launch early)
 const AIM_RATE = 2.2;       // autopilot slerp rate onto the target heading (per second)
@@ -156,6 +156,7 @@ const game = {
   preflight: 0,               // seconds left in the frozen pre-launch/aim window
   testFlight: false,          // free-flight sandbox — no contract, clock, fuel, or damage
   debug: false,               // play-test mode: free upgrades + teleport (armed at ship-select)
+  maxGamma: 1,                // highest Lorentz factor reached this career (a persisted record)
   upgrades: { tank: 0, drive: 0, damper: 0, broker: 0, rejuv: 0, overdrive: 0, autopilot: 0 },
   lastResult: null,
 };
@@ -174,7 +175,7 @@ const RANKS = [        // final-balance thresholds → title (tune after playtes
 ];
 function rankFor(bal) { return (RANKS.find(([m]) => bal >= m) || RANKS[RANKS.length - 1])[1]; }
 const records = Object.assign(
-  { bestBalance: 0, bestEarned: 0, mostDeliveries: 0, careers: 0 },
+  { bestBalance: 0, bestEarned: 0, mostDeliveries: 0, topGamma: 0, careers: 0 },
   (() => { try { return JSON.parse(localStorage.getItem(RECORDS_KEY)) || {}; } catch (_) { return {}; } })()
 );
 function commitCareer() {                 // fold this career into the saved bests
@@ -182,10 +183,12 @@ function commitCareer() {                 // fold this career into the saved bes
     balance: game.credits > records.bestBalance,
     earned: game.earned > records.bestEarned,
     deliveries: game.deliveries > records.mostDeliveries,
+    gamma: game.maxGamma > records.topGamma,
   };
   records.bestBalance = Math.max(records.bestBalance, game.credits);
   records.bestEarned = Math.max(records.bestEarned, game.earned);
   records.mostDeliveries = Math.max(records.mostDeliveries, game.deliveries);
+  records.topGamma = Math.max(records.topGamma, game.maxGamma);
   records.careers += 1;
   try { localStorage.setItem(RECORDS_KEY, JSON.stringify(records)); } catch (_) {}
   return beat;
@@ -568,6 +571,9 @@ function setPhase(p) {
 }
 
 function fmtY(y) { return y >= 1000 ? (y / 1000).toFixed(2) + " kyr" : y.toFixed(1) + " yr"; }
+// Lorentz factor for the records — a plain rounded integer with thousands
+// separators (γ ranges from 1 to ~1e6 with maxed Redline Coils).
+function fmtGamma(g) { return Math.round(g).toLocaleString(); }
 
 function buildStation() {
   const s = stations[game.station];
@@ -1059,11 +1065,13 @@ function buildGameOver() {
     `While you flew, the universe aged <b>${fmtY(ship.coordTime)}</b> — ` +
     `you lived <b>${fmtY(ship.shipTime)}</b> of it aboard.<br/>` +
     `Deliveries <b class="good">${game.deliveries}</b>${star(beat.deliveries)} · ` +
-    `botched/towed <b class="bad">${game.failures}</b><br/>` +
+    `botched/towed <b class="bad">${game.failures}</b> · ` +
+    `peak <b>γ ${fmtGamma(game.maxGamma)}</b>${star(beat.gamma)}<br/>` +
     `Career earnings <b class="gold-t">₡${game.earned}</b>${star(beat.earned)} · ` +
     `final balance <b class="gold-t">₡${game.credits}</b>${star(beat.balance)}` +
     `<div class="alltime">— all-time —&nbsp; richest retirement <b class="gold-t">₡${records.bestBalance}</b>` +
-    ` · most deliveries <b>${records.mostDeliveries}</b> · careers flown <b>${records.careers}</b></div>`;
+    ` · most deliveries <b>${records.mostDeliveries}</b> · top <b>γ ${fmtGamma(records.topGamma)}</b>` +
+    ` · careers flown <b>${records.careers}</b></div>`;
 }
 el("go-new").addEventListener("click", () => location.reload());
 
@@ -1076,6 +1084,7 @@ function updateTitleRecords() {
   t.innerHTML =
     `<span class="k">richest retirement</span> <b class="gold-t">₡${records.bestBalance}</b>` +
     ` · <span class="k">most deliveries</span> <b>${records.mostDeliveries}</b>` +
+    ` · <span class="k">top γ</span> <b>${fmtGamma(records.topGamma)}</b>` +
     ` · <span class="k">careers flown</span> <b>${records.careers}</b>`;
 }
 updateTitleRecords();
@@ -1193,17 +1202,25 @@ function updateAutopilotIndicator(doFlash) {
   if (doFlash) { b.classList.remove("flash"); void b.offsetWidth; b.classList.add("flash"); }
 }
 
-// Owned outfits shown as a compact HUD badge (autopilot has its own green badge).
+// Owned outfits shown as compact HUD badges (autopilot has its own green badge).
+// Two rows so the strip doesn't run long: propulsion (fuel & speed) up top,
+// operations (load, pay, career) below.
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
-function updateBadges() {
-  const b = el("upgradeBadge");
-  const owned = UP_KEYS.filter((k) => k !== "autopilot" && game.upgrades[k] > 0);
+const BADGE_GROUPS = [
+  ["tank", "drive", "overdrive"],   // propulsion — Δv capacity, fuel economy, top speed
+  ["damper", "broker", "rejuv"],    // operations — felt load, contract pay, career length
+];
+function renderBadgeGroup(id, groupKeys) {
+  const b = el(id);
+  const owned = groupKeys.filter((k) => game.upgrades[k] > 0);
   b.classList.toggle("on", owned.length > 0);
-  if (owned.length) {
-    b.innerHTML = owned
-      .map((k) => `${UPGRADES[k].icon}<span class="rl">${ROMAN[game.upgrades[k]]}</span>`)
-      .join("<span class='bsep'>·</span>");
-  }
+  if (owned.length) b.innerHTML = owned
+    .map((k) => `${UPGRADES[k].icon}<span class="rl">${ROMAN[game.upgrades[k]]}</span>`)
+    .join("<span class='bsep'>·</span>");
+}
+function updateBadges() {
+  renderBadgeGroup("upgradeBadge", BADGE_GROUPS[0]);
+  renderBadgeGroup("upgradeBadge2", BADGE_GROUPS[1]);
   refreshWarpZones();          // warp thrust zones follow Redline Coils ownership
 }
 let eggToastTimer = null;
@@ -1558,6 +1575,7 @@ function update(dt) {
   const targetBeta = throttleToBeta(ship.throttle);
   ship.beta += (targetBeta - ship.beta) * Math.min(1, dt * (warpBurn ? WARP_SPOOL : SPOOL));
   const gamma = lorentz(ship.beta);
+  if (!game.testFlight && gamma > game.maxGamma) game.maxGamma = gamma;   // career peak γ (a record)
   const phi = rapidity(ship.beta);
   const dphi = Math.abs(phi - dyn.prevPhi);
   dyn.prevPhi = phi;

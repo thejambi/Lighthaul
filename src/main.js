@@ -647,8 +647,7 @@ function buildStation() {
     `pilot age <b>${game.pilotAge.toFixed(1)}</b> / retires ${retireAge()}` +
     ` &nbsp;·&nbsp; credits <b class="gold-t">₡${game.credits}</b>` +
     ` &nbsp;·&nbsp; Δv <b>${game.fuel.toFixed(1)}</b> / ${tankCap()}` +
-    ` &nbsp;·&nbsp; deliveries <b>${game.deliveries}</b>` +
-    (repMult() > 1 ? ` <span class="gold-t">(+${Math.round((repMult() - 1) * 100)}% rep pay)</span>` : "");
+    ` &nbsp;·&nbsp; deliveries <b>${game.deliveries}</b>`;
 
   const seedBtn = el("st-seed");
   seedBtn.textContent = "seed " + worldSeed + " · tap to copy";

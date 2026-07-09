@@ -78,6 +78,10 @@ label — finger-sized targets) to see the leg's real cost — distance, Δv (vs
 your tank), universe-time, and the ship-years you'd age — and accept a run
 straight from the map. Non-contract stations work as a pure trip planner.
 
+Every cluster is procedural. Leave the **map seed** blank at ship-select for a
+random one (shown at the dock so you can note a good one), or type a seed to
+replay the exact same cluster — same stations, layout, and outfit shops.
+
 ## Controls
 
 | Input | Action |

@@ -150,6 +150,7 @@ const game = {
   integrity: 1,               // cargo/passenger condition on the current run (0..1)
   preflight: 0,               // seconds left in the frozen pre-launch/aim window
   testFlight: false,          // free-flight sandbox — no contract, clock, fuel, or damage
+  debug: false,               // play-test mode: free upgrades + teleport (armed at ship-select)
   upgrades: { tank: 0, drive: 0, damper: 0, broker: 0, rejuv: 0, overdrive: 0, autopilot: 0 },
   lastResult: null,
 };
@@ -398,6 +399,27 @@ scene.add(cmb);
 // ---------------------------------------------------------------------------
 // Stations — procedurally named docks scattered across a ~1300 ly cluster
 // ---------------------------------------------------------------------------
+// Seeded RNG so a map can be replayed. Only the WORLD (station layout, names,
+// shops) and the contracts draw from `rng` — visual star fields stay on
+// Math.random. A career's seed is fixed at ship-select; the same string always
+// rebuilds the same cluster.
+function strToSeed(str) {                          // string → 32-bit seed (FNV-1a)
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function mulberry32(a) {                            // fast seedable PRNG → [0,1)
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function randomSeed() { return Math.random().toString(36).slice(2, 8); }  // short shareable string
+let worldSeed = "";
+let rng = Math.random;                             // reassigned by placeStations()
+
 const _LON = ["b", "c", "d", "g", "k", "l", "m", "n", "r", "s", "t", "v", "z",
               "th", "dr", "kr", "tr", "br", "st", "ph", "vel", "cor"];
 const _LC = ["b", "d", "g", "k", "l", "m", "n", "r", "s", "t", "v", "z"];
@@ -405,61 +427,72 @@ const _LV = ["a", "e", "i", "o", "u"];
 const _LV1 = ["a", "e", "i", "o", "u", "ae", "ei", "ia", "au", "y"];
 const _LEND = ["n", "r", "s", "l", "x", "th", "is", "or", "yx"];
 const _SUFFIX = ["Station", "Port", "Relay", "Anchorage", "Hub", "Gate", "Depot", "Yards"];
-const _pick = (a) => a[(Math.random() * a.length) | 0];
+const _pick = (a) => a[(rng() * a.length) | 0];
 
 function coreName() {
   let n = _pick(_LON) + _pick(_LV1);
-  const extra = Math.random() < 0.6 ? 1 : 2;
+  const extra = rng() < 0.6 ? 1 : 2;
   for (let i = 0; i < extra; i++) n += _pick(_LC) + _pick(_LV);
-  if (Math.random() < 0.45) n += _pick(_LEND);
+  if (rng() < 0.45) n += _pick(_LEND);
   return n[0].toUpperCase() + n.slice(1);
 }
 function stationName() { return coreName() + " " + _pick(_SUFFIX); }
 
 // A compact cluster keeps hops short enough that a career is many deliveries,
 // not a couple of doomed voyages (a 500 ly hop ages you centuries below ~0.999c).
-const stations = [{ name: stationName(), pos: new THREE.Vector3(0, 0, 0) }];
-{
+// The persistent `stations` array (and its DOM labels) is created once; a new
+// seed rewrites the names/positions/shops in place so label elements survive.
+const stations = [];
+const labelsRoot = document.getElementById("labels");
+
+function placeStations(seed) {
+  worldSeed = seed || randomSeed();
+  rng = mulberry32(strToSeed(worldSeed));
+
+  const built = [{ name: stationName(), pos: new THREE.Vector3(0, 0, 0) }];
   let guard = 0;
-  while (stations.length < 9 && guard++ < 800) {
+  while (built.length < 9 && guard++ < 800) {
     const p = new THREE.Vector3(
-      (Math.random() * 2 - 1),
-      (Math.random() * 2 - 1) * 0.5,
-      (Math.random() * 2 - 1)
+      (rng() * 2 - 1),
+      (rng() * 2 - 1) * 0.5,
+      (rng() * 2 - 1)
     ).multiplyScalar(170);
     if (p.length() < 30) continue;
-    if (stations.every((s) => s.pos.distanceTo(p) > 40)) {
-      stations.push({ name: stationName(), pos: p });
+    if (built.every((s) => s.pos.distanceTo(p) > 40)) {
+      built.push({ name: stationName(), pos: p });
     }
   }
-}
 
-// Each dock stocks a fixed pair of outfits, so different places sell different
-// upgrades — the map is worth learning. Guarantee every upgrade is sold somewhere.
-stations.forEach((s) => {
-  const a = _pick(UP_KEYS);
-  let b = _pick(UP_KEYS);
-  while (b === a) b = _pick(UP_KEYS);
-  s.shop = [a, b];
-});
-UP_KEYS.forEach((k) => {
-  if (!stations.some((s) => s.shop.includes(k))) {
-    const s = _pick(stations);
-    s.shop[(Math.random() * 2) | 0] = k;
-  }
-});
+  // Each dock stocks a fixed pair of outfits, so different places sell different
+  // upgrades — the map is worth learning. Guarantee every upgrade is sold somewhere.
+  built.forEach((s) => {
+    const a = _pick(UP_KEYS);
+    let b = _pick(UP_KEYS);
+    while (b === a) b = _pick(UP_KEYS);
+    s.shop = [a, b];
+  });
+  UP_KEYS.forEach((k) => {
+    if (!built.some((s) => s.shop.includes(k))) {
+      _pick(built).shop[(rng() * 2) | 0] = k;
+    }
+  });
 
-// HTML labels for stations (aberration-aware, target highlighted)
-const labelsRoot = document.getElementById("labels");
-for (const st of stations) {
-  const el = document.createElement("div");
-  el.className = "landmark";
-  el.innerHTML = `<span class="dot"></span><span class="tag"><span class="nm"></span><span class="d"></span></span>`;
-  el.querySelector(".nm").textContent = st.name;
-  labelsRoot.appendChild(el);
-  st.el = el;
-  st.dEl = el.querySelector(".d");
+  // Commit into the persistent array, creating each station's DOM label on the
+  // first build and just refreshing name/pos/shop on later re-seeds.
+  built.forEach((b, i) => {
+    let st = stations[i];
+    if (!st) {
+      const div = document.createElement("div");
+      div.className = "landmark";
+      div.innerHTML = `<span class="dot"></span><span class="tag"><span class="nm"></span><span class="d"></span></span>`;
+      labelsRoot.appendChild(div);
+      st = stations[i] = { el: div, dEl: div.querySelector(".d") };
+    }
+    st.name = b.name; st.pos = b.pos; st.shop = b.shop;
+    st.el.querySelector(".nm").textContent = b.name;
+  });
 }
+placeStations(randomSeed());   // an initial cluster so menus/test-flight work pre-career
 
 // ---------------------------------------------------------------------------
 // Contracts
@@ -475,16 +508,16 @@ function makeContracts(fromIdx) {
   const offers = [];
   const used = new Set([fromIdx]);
   while (offers.length < 3 && used.size < stations.length) {
-    const t = (Math.random() * stations.length) | 0;
+    const t = (rng() * stations.length) | 0;
     if (used.has(t)) continue;
     used.add(t);
     const d = stations[fromIdx].pos.distanceTo(stations[t].pos);
     // inertial rating: max maneuvering G the load tolerates. Lower = more
     // fragile = must burn/brake gently = a demand premium on the pay.
-    if (Math.random() < 0.55) {
+    if (rng() < 0.55) {
       // cargo: universe-time deadline — requires a minimum average speed
-      const betaReq = 0.55 + Math.random() * 0.4;
-      const gLimit = Math.round(4 + Math.random() * 14);        // 4–18 g
+      const betaReq = 0.55 + rng() * 0.4;
+      const gLimit = Math.round(4 + rng() * 14);        // 4–18 g
       offers.push({
         type: "cargo", what: _pick(CARGO), to: t, d, gLimit,
         deadline: d / betaReq + 4,
@@ -495,8 +528,8 @@ function makeContracts(fromIdx) {
       // humane: γ demands top out near 0.997c (not an impossible 0.9993c), and
       // the cap carries a fixed +slack for the accel/brake ramp — which ages them
       // at low γ, worse the gentler (lower-g) the ramp has to be.
-      const gReq = 4 + Math.random() * 12;                       // need average γ ≈ 3–13
-      const gLimit = Math.round(4 + Math.random() * 4);          // 4–8 g (humans)
+      const gReq = 4 + rng() * 12;                       // need average γ ≈ 3–13
+      const gLimit = Math.round(4 + rng() * 4);          // 4–8 g (humans)
       offers.push({
         type: "passenger", what: _pick(PAX), to: t, d, gLimit,
         deadline: d / 0.7 + 10,
@@ -539,6 +572,9 @@ function buildStation() {
     ` &nbsp;·&nbsp; credits <b class="gold-t">₡${game.credits}</b>` +
     ` &nbsp;·&nbsp; Δv <b>${game.fuel.toFixed(1)}</b> / ${tankCap()}` +
     ` &nbsp;·&nbsp; deliveries <b>${game.deliveries}</b>`;
+
+  el("st-seed").textContent = "seed " + worldSeed;
+  el("st-debug").style.display = game.debug ? "" : "none";
 
   el("st-ship").innerHTML =
     `<div class="ship-mini">${SHIP_ART[game.cls]}</div>` +
@@ -595,7 +631,7 @@ function buildShop() {
     let ctrl;
     if (owned) ctrl = `<span class="shop-max">${u.oneShot ? "OWNED" : "MAX"}</span>`;
     else {
-      const afford = game.credits >= cost;
+      const afford = game.debug || game.credits >= cost;   // debug: buy anything, price still shown
       ctrl = `<button class="btn ${afford ? "gold" : ""} shop-buy" data-k="${k}"${afford ? "" : " disabled"}>₡${cost}</button>`;
     }
     html += `<div class="shop-row"><span class="shop-ic">${u.icon}</span>` +
@@ -609,8 +645,11 @@ function buildShop() {
 function buyUpgrade(k) {
   const lv = game.upgrades[k];
   const cost = UPGRADES[k].costs[lv];
-  if (cost === undefined || game.credits < cost) return;
-  game.credits -= cost;
+  if (cost === undefined) return;
+  if (!game.debug) {                    // debug play-test mode: outfits are free
+    if (game.credits < cost) return;
+    game.credits -= cost;
+  }
   game.upgrades[k] = lv + 1;
   if (k === "autopilot") { autopilotAssist = true; updateAutopilotIndicator(false); }
   updateBadges();
@@ -765,6 +804,8 @@ function selectMapNode(i) {
   } else {
     html += `<span class="dim">no contract to this station</span>`;
   }
+  if (game.debug) html += `<div class="dbg-line"><button class="btn dbg-btn" id="map-tp">◈ TELEPORT HERE</button>` +
+    `<span class="dim">debug — dock instantly, re-rolls contracts</span></div>`;
   box.innerHTML = html;
 
   const acc = el("map-accept");
@@ -772,6 +813,18 @@ function selectMapNode(i) {
     if (acc.dataset.armed) depart(c);
     else { acc.dataset.armed = "1"; acc.textContent = "CONFIRM UNDOCK"; acc.classList.add("armed"); }
   });
+  const tp = el("map-tp");
+  if (tp) tp.addEventListener("click", () => teleport(i));
+}
+
+// debug: dock instantly at any station (no flight, no fuel/age cost). setPhase
+// re-rolls that dock's contracts and rebuilds the screen, like a real arrival.
+function teleport(i) {
+  game.station = i;
+  ship.pos.copy(stations[i].pos);
+  ship.throttle = 0; ship.beta = 0;
+  setPhase("station");
+  showEggToast("◈ teleported to " + stations[i].name);
 }
 
 // tap anywhere in a station's hit-group (node, label, or the padding around them)
@@ -1039,7 +1092,8 @@ function buildClassSelect() {
     div.innerHTML =
       `<div class="cc-art" data-cls="${key}" title="Take it for a test flight">${SHIP_ART[key]}` +
       `<span class="cc-testhint">▸ test fly</span></div>` +
-      `<div class="cc-head"><span class="cc-name">${c.name}</span><span class="cc-tag">${c.tag}</span></div>` +
+      `<div class="cc-head"><span class="cc-name">${c.name}</span>` +
+      `<span class="cc-tag"${key === "interceptor" ? ' id="egg-badge"' : ""}>${c.tag}</span></div>` +
       stat("Δv tank", c.pips.tank) + stat("fuel economy", c.pips.fuel) +
       stat("handling", c.pips.handling) + stat("cargo care", c.pips.care) +
       `<div class="cc-stat"><span class="cc-lab">start credits</span><span class="cc-credits gold-t">₡${c.credits}</span></div>` +
@@ -1051,13 +1105,33 @@ function buildClassSelect() {
     b.addEventListener("click", () => applyClass(b.dataset.cls)));
   box.querySelectorAll(".cc-art[data-cls]").forEach((a) =>
     a.addEventListener("click", () => startTestFlight(a.dataset.cls, "select")));
+
+  // easter egg: tap the Interceptor's "HIGH SKILL" badge 5× to arm play-test mode
+  // for whichever ship you then pick (free upgrades + teleport). Resets each career.
+  const badge = el("egg-badge");
+  if (badge) badge.addEventListener("click", (e) => {
+    e.stopPropagation();
+    eggTaps++;
+    clearTimeout(eggTapTimer);
+    eggTapTimer = setTimeout(() => (eggTaps = 0), 1200);
+    if (eggTaps >= 5) {
+      eggTaps = 0; debugArmed = true;
+      badge.classList.add("armed");
+      showEggToast("◈ DEBUG ARMED — pick a ship to fly it");
+    }
+  });
 }
+let debugArmed = false, eggTaps = 0, eggTapTimer = null;
 
 function applyClass(key) {
   game.cls = key;
   const c = CLASSES[key];
   game.credits = c.credits;
   game.fuel = c.tank;           // start with a full tank of the class's size
+  game.debug = debugArmed;      // the badge easter egg arms it; a career keeps it, next resets
+  debugArmed = false;
+  const seedEl = el("seed-input");
+  placeStations(seedEl ? seedEl.value.trim() : "");   // typed seed, or a fresh random one
   setPhase("station");
 }
 buildClassSelect();

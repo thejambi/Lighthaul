@@ -292,6 +292,34 @@
   .cc-credits { font-size: 13px; }
   .cc-blurb { margin: 11px 0 13px; font-size: 11.5px; line-height: 1.6; color: var(--hud-dim); flex: 1; }
   .classcard .btn { margin: 0; text-align: center; }
+  #egg-badge { cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .cc-tag.armed { color: #fff; border-color: var(--gold); background: rgba(255,215,106,.22);
+    box-shadow: 0 0 10px rgba(255,215,106,.5); }
+
+  /* map seed input (tucked under the ship cards) */
+  .seed-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 12px;
+    border-top: 1px solid rgba(143,233,255,.12); font-size: 11px; color: var(--hud-dim); }
+  .seed-row label { letter-spacing: 1px; text-transform: uppercase; }
+  #seed-input { font: inherit; font-size: 12px; color: var(--hud); background: rgba(0,0,0,.3);
+    border: 1px solid rgba(143,233,255,.3); border-radius: 5px; padding: 4px 8px; width: 120px;
+    letter-spacing: .5px; }
+  #seed-input:focus { outline: none; border-color: rgba(143,233,255,.6); }
+  #seed-input::placeholder { color: var(--hud-dim); opacity: .7; }
+  .seed-note { opacity: .8; }
+
+  /* dock seed + debug chips */
+  .dock-meta { display: flex; align-items: center; gap: 8px; margin: -2px 0 8px; }
+  .seed-chip { font-size: 10px; letter-spacing: 1px; color: var(--hud-dim);
+    border: 1px solid rgba(143,233,255,.2); border-radius: 10px; padding: 2px 9px; text-transform: uppercase; }
+  .debug-chip { font-size: 10px; letter-spacing: 1.5px; color: var(--gold);
+    border: 1px solid rgba(255,215,106,.5); border-radius: 10px; padding: 2px 9px;
+    background: rgba(255,215,106,.1); }
+
+  /* debug teleport control in the trip planner */
+  .dbg-line { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
+  .dbg-btn { margin: 0; color: var(--gold); border-color: rgba(255,215,106,.5); background: rgba(255,215,106,.08);
+    padding: 5px 12px; font-size: 12px; }
+  .dbg-btn:hover { background: rgba(255,215,106,.18); color: #fff; }
 
   /* outfitting shop */
   #st-shop { margin-top: 16px; }
@@ -423,6 +451,11 @@
       <div class="stat-line" style="margin:4px 0 14px">Each hull is a different trade — and you fly the whole career in it.
         You can patch a weakness with upgrades later, but the ship you pick shapes how you'll haul.</div>
       <div id="class-list"></div>
+      <div class="seed-row">
+        <label for="seed-input">map seed</label>
+        <input id="seed-input" type="text" maxlength="16" placeholder="random" autocomplete="off" spellcheck="false"/>
+        <span class="seed-note">optional — reuse a seed to replay the same cluster</span>
+      </div>
     </div>
   </div>
 
@@ -430,6 +463,7 @@
   <div id="station" class="screen hiddenS">
     <div class="card" style="max-width:720px">
       <h2 id="st-name">Station</h2>
+      <div class="dock-meta"><span id="st-seed" class="seed-chip"></span><span id="st-debug" class="debug-chip" style="display:none">◈ DEBUG</span></div>
       <div class="stat-line" id="st-stats"></div>
       <div id="st-ship"></div>
       <div id="st-lowfuel" class="lowfuel" style="display:none"></div>

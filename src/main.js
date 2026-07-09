@@ -444,11 +444,19 @@ let worldSeed = "";
 let rng = Math.random;                             // reassigned by placeStations()
 
 const _LON = ["b", "c", "d", "g", "k", "l", "m", "n", "r", "s", "t", "v", "z",
-              "th", "dr", "kr", "tr", "br", "st", "ph", "vel", "cor"];
-const _LC = ["b", "d", "g", "k", "l", "m", "n", "r", "s", "t", "v", "z"];
-const _LV = ["a", "e", "i", "o", "u"];
-const _LV1 = ["a", "e", "i", "o", "u", "ae", "ei", "ia", "au", "y"];
-const _LEND = ["n", "r", "s", "l", "x", "th", "is", "or", "yx"];
+              "th", "dr", "kr", "tr", "br", "st", "ph", "vel", "cor",
+              "f", "h", "j", "p", "w", "sh", "ch", "gr", "pr", "fr", "cl", "gl",
+              "bl", "sk", "sp", "sl", "thr", "str", "vor", "mor", "sar", "hel",
+              "ser", "zor", "syn", "lyr", "thal", "cyg"];
+const _LC = ["b", "d", "g", "k", "l", "m", "n", "r", "s", "t", "v", "z",
+             "c", "f", "p", "x", "th", "sh", "ch", "ph", "ss", "ll", "nn", "rr",
+             "nd", "nt", "rn", "ld", "sk", "st", "dr", "tr"];
+const _LV = ["a", "e", "i", "o", "u", "y"];   // medial vowel stays crisp (diphthongs pile up if repeated)
+const _LV1 = ["a", "e", "i", "o", "u", "ae", "ei", "ia", "au", "y",
+              "ea", "eo", "io", "oa", "ou", "ui", "ya", "yo"];
+const _LEND = ["n", "r", "s", "l", "x", "th", "is", "or", "yx",
+               "m", "k", "d", "sh", "ss", "ll", "rn", "sk", "st", "nx", "rk",
+               "ld", "nt", "ron", "dor", "thar", "vex", "nyx", "rax", "dex", "mir", "var"];
 const _SUFFIX = [
   "Station", 
   "Port", 

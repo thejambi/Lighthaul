@@ -489,6 +489,9 @@ const _SUFFIX = [
   "Vista",
   "Orbital"
 ];
+// strip the trailing " <Suffix>" for compact map labels — derived from _SUFFIX
+// so any suffix added above is trimmed automatically (all are plain words)
+const _SUFFIX_RE = new RegExp(" (?:" + _SUFFIX.join("|") + ")$");
 const _pick = (a) => a[(rng() * a.length) | 0];
 
 function coreName() {
@@ -830,7 +833,7 @@ function buildStarMap() {
     idx !== skip && b.x1 < o.x2 && b.x2 > o.x1 && b.y1 < o.y2 && b.y2 > o.y1);
   stations.forEach((st, i) => {
     const c = game.offers.find((o) => o.to === i);
-    st._nm = st.name.replace(/ (Station|Anchorage|Depot|Yards|Relay|Port|Hub|Gate)$/, "");
+    st._nm = st.name.replace(_SUFFIX_RE, "");
     let w = 3 + st._nm.length * 1.9;                     // ~monospace advance at font-size 3
     if (c) w = Math.max(w, 24);                          // the ✓/✗ sub-line can be wider than the name
     const up = 2.4, dn = c ? 6.2 : 2.2;                  // taller footprint when a sub-line follows

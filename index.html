@@ -26,6 +26,8 @@
     color: var(--hud);
     user-select: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;              /* no iOS long-press magnifier / selection loupe */
+    -webkit-tap-highlight-color: transparent; /* no grey flash on tap */
     cursor: crosshair;
   }
   canvas { display: block; touch-action: none; }
@@ -109,7 +111,8 @@
   #throttleWrap { top: 14px; right: 14px; width: 60px; height: 260px; display: flex; flex-direction: column; align-items: center; }
   #throttleWrap .label { font-size: 10px; color: var(--hud-dim); margin-bottom: 6px; letter-spacing: 1px; }
   #throttleBar { position: relative; flex: 1; width: 30px; border: 1px solid rgba(143,233,255,.3); border-radius: 15px; overflow: hidden; background: rgba(0,0,0,.4);
-    pointer-events: auto; cursor: pointer; touch-action: none; }
+    pointer-events: auto; cursor: pointer; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   #throttleFill { position: absolute; bottom: 0; left: 0; right: 0; height: 0%;
     background: linear-gradient(0deg, #1b6f8a, #5fe6ff); transition: height .05s linear; }
   /* hold-to-ramp zones layered over the bar */

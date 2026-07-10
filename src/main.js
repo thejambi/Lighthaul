@@ -274,6 +274,14 @@ function apDecelFor(gLimit) {
   const d = (gLimit * AP_BRAKE_G) / (LOAD_K * loadFactor() * 2.7);
   return THREE.MathUtils.clamp(d, AP_DECEL, AP_DECEL * 5);
 }
+// The rate the autopilot actually pulls the throttle down: the g-budgeted rate,
+// but never faster than the player's own best throttle-down (turbo, or warp with
+// Redline Coils, scaled by handling) — so the assist can't do the superhuman
+// instant stop a hot arrival would otherwise get.
+function apDecelRate(gLimit) {
+  const playerMax = THRUST_RATE * (game.upgrades.overdrive > 0 ? WARP_X : TURBO_X) * shipCls().handling;
+  return Math.min(apDecelFor(gLimit), playerMax);
+}
 
 // --- upgrade effects: each derived dial folds in the owned level. Kept as live
 // getters (not baked constants) so buying mid-career takes effect immediately.
@@ -1703,20 +1711,21 @@ function update(dt) {
     const apTgt = stations[game.contract.to];
     const apDist = apTgt.pos.distanceTo(ship.pos);
     _dir.copy(apTgt.pos).sub(ship.pos).normalize();
-    const decel = apDecelFor(game.contract.gLimit);
+    const decel = apDecelRate(game.contract.gLimit);
     if (_fwd.dot(_dir) > 0.2) {
       if (!apBraking && ship.beta > DOCK_BETA && apDist < 200 &&
           apDist - DOCK_RADIUS <= apBrakeDistance(ship.beta, decel)) {
         apBraking = true;
       }
-      if (apBraking) {
+      if (apBraking && apDist >= DOCK_RADIUS) {
         // outside dock range, throttle-down is floored at a slow drift so the
         // ship keeps creeping in rather than stopping short of the dock
         ship.throttle = Math.max(betaToThrottle(0.15), ship.throttle - decel * dt);
       }
     }
-    // once inside dock range, cut the engine entirely and coast down to dock speed
-    if (apDist < DOCK_RADIUS) ship.throttle = 0;
+    // inside dock range, keep easing the throttle to a full stop at that same
+    // capped, g-respecting rate — a hot arrival still has to bleed off its speed
+    if (apDist < DOCK_RADIUS) ship.throttle = Math.max(0, ship.throttle - decel * dt);
   }
 
   // --- speed easing + FUEL: burn |Δrapidity| (proper Δv of the maneuver) ---

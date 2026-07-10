@@ -1695,11 +1695,13 @@ function update(dt) {
     const aimRate = launching ? AIM_RATE : (autopilotAssist ? AIM_RATE * 0.5 : AIM_RATE * 1.3);
     aimAtPos(aimGoal, dt, aimRate * agility);
     shipForward(_fwd);                    // refresh heading after the assist turned us
-    // A tapped aim is a one-shot slew: release the lock once we're pointed at it,
-    // so it won't yank you back after an overshoot. The autopilot keeps its lock.
+    // A tapped aim is a one-shot slew: once we're essentially there, snap exactly
+    // onto the target heading and release — so it locks dead-centre, never a hair
+    // short — and won't yank you back after a later overshoot. (_aimQuat is the
+    // exact aim orientation aimAtPos just computed.) The autopilot keeps its lock.
     if (aimStation && !autopilotAssist) {
       _dir.copy(aimStation.pos).sub(ship.pos).normalize();
-      if (_fwd.dot(_dir) > 0.9999) aimStation = null;
+      if (_fwd.dot(_dir) > 0.9999) { ship.quat.copy(_aimQuat); aimStation = null; }
     }
   }
 

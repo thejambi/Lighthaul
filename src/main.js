@@ -210,7 +210,7 @@ const ship = {
 // (soft-capped) — length contraction made real.
 const PROPER_RATE = 0.4;
 const GAMMA_CAP = 40;
-const REDLINE_RAMP = 0.6;     // past the softcap, a slow log climb (see pace()) so redline speeds keep gaining
+const REDLINE_RAMP = 0.25;     // past the softcap, a slow log climb (see pace()) so redline speeds keep gaining
 const REDLINE_GAMMA = 2000;   // γ above which the HUD SPEED/Lorentz readouts go red + buzz
 
 // Effective speed cap. C_CAP is the stock governor; each Redline Coils level
@@ -740,7 +740,7 @@ function buyUpgrade(k) {
     game.credits -= cost;
   }
   game.upgrades[k] = lv + 1;
-  if (k === "autopilot") { autopilotAssist = true; updateAutopilotIndicator(false); }
+  if (k === "autopilot") { apUnlocked = true; autopilotAssist = true; updateAutopilotIndicator(false); }
   updateBadges();
   buildStation();               // re-render stats, offer pay, and shop
   showEggToast(`${UPGRADES[k].icon} ${UPGRADES[k].name} installed`);
@@ -1232,6 +1232,7 @@ let aimStation = null;                      // tapped/assisted aim target (a sta
 let uiHidden = false;
 let started = false;
 let autopilotAssist = false;   // easter-egg "docking assist" — auto-cuts throttle to dock
+let apUnlocked = false;        // once bought or egg-enabled: the HUD badge shows + toggles it
 let apBraking = false;         // set each frame when the assist is actively braking
 
 const audio = createAudio();
@@ -1324,6 +1325,7 @@ window.addEventListener("keyup", (e) => keys.delete(e.code));
 // you always dock cleanly). Enable it with the Konami code on a keyboard, or by
 // tapping the station header five times on touch.
 function toggleAutopilot() {
+  apUnlocked = true;                       // learning the trick unlocks the toggle badge for good
   autopilotAssist = !autopilotAssist;
   if (!autopilotAssist) apBraking = false;
   updateAutopilotIndicator(true);
@@ -1331,9 +1333,13 @@ function toggleAutopilot() {
 }
 function updateAutopilotIndicator(doFlash) {
   const b = el("autoBadge");
+  b.classList.toggle("shown", apUnlocked);   // visible once owned, even when toggled off
   b.classList.toggle("on", autopilotAssist);
+  b.textContent = "◈ DOCKING ASSIST · " + (autopilotAssist ? "ON" : "OFF");
   if (doFlash) { b.classList.remove("flash"); void b.offsetWidth; b.classList.add("flash"); }
 }
+// tap the badge on the flight HUD to toggle the assist on/off
+el("autoBadge").addEventListener("click", (e) => { e.stopPropagation(); toggleAutopilot(); });
 
 // Owned outfits shown as compact HUD badges (autopilot has its own green badge).
 // Two rows so the strip doesn't run long: propulsion (fuel & speed) up top,
@@ -1681,6 +1687,12 @@ function update(dt) {
     const aimRate = launching ? AIM_RATE : (autopilotAssist ? AIM_RATE * 0.5 : AIM_RATE * 1.3);
     aimAtPos(aimGoal, dt, aimRate * agility);
     shipForward(_fwd);                    // refresh heading after the assist turned us
+    // A tapped aim is a one-shot slew: release the lock once we're pointed at it,
+    // so it won't yank you back after an overshoot. The autopilot keeps its lock.
+    if (aimStation && !autopilotAssist) {
+      _dir.copy(aimStation.pos).sub(ship.pos).normalize();
+      if (_fwd.dot(_dir) > 0.9999) aimStation = null;
+    }
   }
 
   // --- autopilot docking assist (easter egg): a throttle-down kicked off at the

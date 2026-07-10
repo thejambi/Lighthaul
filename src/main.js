@@ -706,7 +706,7 @@ function buildStation() {
     selectMapNode(mapSelected);
   } else {
     buildStarMap();
-    el("map-detail").innerHTML = '<span class="dim">Tap a destination to plan the leg — ✓/✗ shows what your chosen speed can deliver.</span>';
+    el("map-detail").innerHTML = '<span class="dim">Tap a destination — for a contract you\'ll see the minimum speed it needs and whether you can make the run.</span>';
   }
 
   buildShop();
@@ -806,14 +806,36 @@ el("st-seed").addEventListener("click", () => {
 // pay + g-rating and a live ✓/✗ for the chosen cruise speed. Every station sits
 // in a large invisible hit-group (node + label both tappable — finger-sized).
 // ---------------------------------------------------------------------------
-let mapBeta = 0.999;
 let mapSelected = -1;
 
-// can this contract be delivered cruising at beta b, on the current tank?
-function contractFeasible(c, b) {
-  const g = lorentz(b);
-  const meets = c.type === "cargo" ? c.d / b <= c.deadline : c.d / (b * g) <= c.maxAging;
-  return meets && 2 * rapidity(b) <= game.fuel;
+// The minimum this contract demands: the slowest average speed that still meets
+// its clause, plus whether your governor can reach it and your tank can afford
+// the round-trip Δv. Cargo is bound by the universe-time deadline (d/β); a
+// passenger by the aging cap (d/βγ ≤ maxAging → βγ ≥ K, closed-formed below).
+function contractReq(c) {
+  const d = c.d;
+  let betaMin;
+  if (c.type === "cargo") {
+    betaMin = d / c.deadline;
+  } else {
+    const K = d / c.maxAging;                       // required proper velocity βγ
+    betaMin = Math.max(K / Math.sqrt(1 + K * K), d / c.deadline);   // aging vs the soft deadline
+  }
+  betaMin = Math.min(betaMin, 1 - 1e-12);
+  const dv = 2 * Math.atanh(betaMin);               // accel + brake at that speed
+  const reachable = betaMin <= capBeta();
+  const affordable = dv <= game.fuel;
+  return { betaMin, gammaMin: lorentz(betaMin), dv, reachable, affordable, feasible: reachable && affordable };
+}
+// Fastest round-trip speed your current Δv (and governor) allows — for planning
+// a leg to a station with no contract. 2·atanh(β) = fuel ⇒ β = tanh(fuel/2).
+function planBeta() { return Math.min(Math.tanh(game.fuel / 2), capBeta()); }
+
+// β near c needs many 9s to read right (γ carries the real precision).
+function fmtBeta(b) {
+  if (b < 0.9999) return b.toFixed(4);
+  const nines = Math.min(9, Math.floor(-Math.log10(Math.max(1 - b, 1e-12))));
+  return b.toFixed(nines + 2);
 }
 
 function buildStarMap() {
@@ -889,7 +911,7 @@ function buildStarMap() {
       `<circle cx="${st._mx}" cy="${st._my}" r="${r}" class="map-node ${cls}"/>` +
       `<text x="${tx}" y="${st._my + 1 + st._ldy}"${anchor} class="map-label ${cls}">${st._nm}</text>`;
     if (c) {
-      const ok = contractFeasible(c, mapBeta);
+      const ok = contractReq(c).feasible;
       out += `<text x="${tx}" y="${st._my + 4.6 + st._ldy}"${anchor} class="map-sub ${ok ? "ok" : "no"}">` +
         `${ok ? "✓" : "✗"} ₡${contractPay(c)} · ${c.gLimit}g</text>`;
     }
@@ -912,30 +934,48 @@ function selectMapNode(i) {
     box.innerHTML = `<div class="name">${stations[i].name}</div><span class="dim">You are docked here.</span>`;
     return;
   }
-  const b = mapBeta, g = lorentz(b);
   const d = stations[game.station].pos.distanceTo(stations[i].pos);
-  const uni = d / b, aged = d / (b * g), dv = 2 * rapidity(b);
-  const fuelOk = dv <= game.fuel;
   const c = game.offers.find((o) => o.to === i);
 
-  let html = `<div class="name">${stations[i].name}</div>`;
-  html += `<span class="k">distance</span> ${d.toFixed(0)} ly &nbsp;·&nbsp; ` +
-          `<span class="k">Δv</span> <span class="${fuelOk ? "" : "bad"}">${dv.toFixed(1)}</span> / ${game.fuel.toFixed(1)}<br/>`;
-  html += `at <b>${b}c</b>: <span class="k">universe</span> ${fmtY(uni)} &nbsp;·&nbsp; ` +
-          `<span class="k">you age</span> <b>${aged.toFixed(2)} yr</b><br/>`;
+  // Speed the trip breakdown is based on: a passenger holds the aging-cap
+  // minimum (that's the whole job); cargo and empty legs fly the fastest your Δv
+  // affords — cargo's deadline is easy, so the real cost is the fuel you spend to
+  // stay young.
+  let beta, gamma, verdict = "", feasible = true;
+  let html = "";
   if (c) {
-    const need = c.type === "cargo"
-      ? `deadline ${fmtY(c.deadline)} — need ≥ ${Math.min(0.99, c.d / c.deadline).toFixed(2)}c`
-      : `age cap ${c.maxAging.toFixed(1)} yr — need γ ≥ ${(c.d / c.maxAging).toFixed(1)}`;
-    const meets = c.type === "cargo" ? uni <= c.deadline : aged <= c.maxAging;
-    const frag = c.gLimit <= 6 ? `<span class="bad">fragile: ${c.gLimit}g</span>` : `${c.gLimit}g`;
-    html += `<span class="k">${c.type === "cargo" ? "FREIGHT" : "PASSAGE"}</span> ${c.what} · ` +
-            `<span class="gold-t">₡${contractPay(c)}</span> · ${frag}<br/>` +
-            `<span class="${meets ? "good" : "bad"}">${meets ? "✓ meets" : "✗ misses"}</span> ${need}` +
-            ` <button class="btn ${meets ? "gold" : ""}" id="map-accept" style="margin-left:8px;padding:5px 12px">ACCEPT & UNDOCK</button>`;
+    const req = contractReq(c);
+    feasible = req.feasible;
+    const frag = c.gLimit <= 6 ? `<span class="frag">fragile: ${c.gLimit}g rating</span>` : `rugged: ${c.gLimit}g rating`;
+    html += `<div class="job">${c.type === "cargo" ? "FREIGHT" : "PASSAGE"} — ${c.what}<span class="pay">₡${contractPay(c)}</span></div>`;
+    html += c.type === "cargo"
+      ? `<div class="req">deadline <b>${fmtY(c.deadline)}</b> universe-time · needs ≥ <b>${fmtBeta(req.betaMin)}c</b> average</div>`
+      : `<div class="req">must arrive aged ≤ <b>${c.maxAging.toFixed(1)} yr</b> · keep average γ ≥ <b>${req.gammaMin.toFixed(1)}</b></div>`;
+    html += `<div class="req">${frag} · to <b>${stations[i].name}</b></div>`;
+    verdict = !req.reachable ? `<span class="bad">✗ too fast for your governor — needs Redline Coils</span>`
+            : !req.affordable ? `<span class="bad">✗ not enough Δv — need ${req.dv.toFixed(1)}, refuel first</span>`
+            : `<span class="good">✓ you can make this run</span>`;
+    if (c.type === "passenger") { beta = req.betaMin; gamma = req.gammaMin; }
+    else { beta = planBeta(); gamma = lorentz(beta); }
   } else {
-    html += `<span class="dim">no contract to this station</span>`;
+    beta = planBeta(); gamma = lorentz(beta);
+    html += `<div class="name">${stations[i].name}</div><div class="dim">no contract here — trip planner</div>`;
   }
+
+  // trip breakdown at that speed
+  const dv = 2 * Math.atanh(Math.min(beta, 1 - 1e-12));
+  const uni = beta > 1e-9 ? d / beta : Infinity;
+  const aged = beta > 1e-9 ? d / (beta * gamma) : Infinity;
+  const gTxt = gamma < 20 ? gamma.toFixed(1) : fmtGamma(gamma);
+  const lead = (c && c.type === "passenger") ? "at the minimum" : "at your best affordable";
+  html += `<div class="trip">` +
+    `<span class="k">distance</span> ${d.toFixed(0)} ly &nbsp;·&nbsp; ${lead} <b>${fmtBeta(beta)}c</b> (γ ${gTxt})<br/>` +
+    `<span class="k">Δv</span> <span class="${dv <= game.fuel + 1e-6 ? "" : "bad"}">${dv.toFixed(1)}</span> / ${game.fuel.toFixed(1)} ` +
+    `&nbsp;·&nbsp; <span class="k">universe</span> ${fmtY(uni)} &nbsp;·&nbsp; <span class="k">you age</span> <b>${aged.toFixed(2)} yr</b>` +
+    `</div>`;
+
+  if (c) html += `<div class="verdict">${verdict}` +
+    ` <button class="btn ${feasible ? "gold" : ""}" id="map-accept" style="margin-left:8px;padding:5px 12px">ACCEPT & UNDOCK</button></div>`;
   if (game.debug) html += `<div class="dbg-line"><button class="btn dbg-btn" id="map-tp">◈ TELEPORT HERE</button>` +
     `<span class="dim">debug — dock instantly, re-rolls contracts</span></div>`;
   box.innerHTML = html;
@@ -963,14 +1003,6 @@ function teleport(i) {
 el("map-svg").addEventListener("click", (e) => {
   const t = e.target.closest("[data-i]");
   if (t) selectMapNode(+t.dataset.i);
-});
-el("map-speeds").addEventListener("click", (e) => {
-  const btn = e.target.closest(".mapspd");
-  if (!btn) return;
-  mapBeta = parseFloat(btn.dataset.b);
-  el("map-speeds").querySelectorAll(".mapspd").forEach((b) => b.classList.toggle("active", b === btn));
-  if (mapSelected >= 0) selectMapNode(mapSelected);
-  else buildStarMap();                    // recolor the ✓/✗ sub-lines for the new speed
 });
 
 // ---------------------------------------------------------------------------

@@ -378,11 +378,6 @@
   /* star map (lives inside the station card — the contract browser) */
   .map-hint { font-size: 11px; letter-spacing: 1.5px; color: var(--hud-dim); margin: 14px 0 8px;
     border-top: 1px solid rgba(143,233,255,.15); padding-top: 12px; }
-  #map-speeds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-  .mapspd { pointer-events: auto; cursor: pointer; font: inherit; font-size: 12px;
-    color: var(--hud-dim); background: rgba(143,233,255,.05); border: 1px solid rgba(143,233,255,.25);
-    border-radius: 5px; padding: 5px 10px; }
-  .mapspd.active { color: #fff; background: rgba(143,233,255,.2); border-color: rgba(143,233,255,.6); }
   #map-svg { width: 100%; height: 40vh; max-height: 340px; display: block;
     background: radial-gradient(ellipse at center, rgba(10,24,34,.5), rgba(2,8,14,.5));
     border: 1px solid rgba(143,233,255,.18); border-radius: 8px; pointer-events: auto; }
@@ -400,7 +395,7 @@
   .map-label { font-size: 3px; fill: var(--hud-dim); font-family: inherit; }
   .map-label.dest { fill: var(--gold); }
   .map-label.dock { fill: #fff; }
-  /* contract quick-view under the name: ✓/✗ pay · g-rating at the chosen speed */
+  /* contract quick-view under the name: ✓/✗ (can you make the run) · pay · g-rating */
   .map-sub { font-size: 2.6px; font-family: inherit; }
   .map-sub.ok { fill: var(--ok); }
   .map-sub.no { fill: var(--warn); }
@@ -408,6 +403,14 @@
   #map-detail .dim { color: var(--hud-dim); }
   #map-detail .k { color: var(--hud-dim); }
   #map-detail .name { color: #fff; font-size: 14px; }
+  #map-detail .job { display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    color: #fff; font-size: 14px; letter-spacing: .5px; margin-bottom: 2px; }
+  #map-detail .pay { color: var(--gold); font-size: 15px; flex: none; text-shadow: 0 0 10px rgba(255,215,106,.35); }
+  #map-detail .req { font-size: 12px; color: var(--hud-dim); }
+  #map-detail .req b { color: var(--hud); }
+  #map-detail .frag { color: var(--warn); }
+  #map-detail .trip { margin-top: 9px; padding-top: 9px; border-top: 1px solid rgba(143,233,255,.15); }
+  #map-detail .verdict { margin-top: 9px; }
 
   /* retirement rank + records */
   .rank { font-size: 15px; letter-spacing: 1px; color: var(--hud-dim); margin-bottom: 12px;
@@ -504,14 +507,7 @@
       <div class="stat-line" id="st-stats"></div>
       <div id="st-ship"></div>
       <div id="st-lowfuel" class="lowfuel" style="display:none"></div>
-      <div class="map-hint">CONTRACTS &amp; TRIP PLANNER · pick a cruise speed, tap a destination — gold routes are your offers</div>
-      <div id="map-speeds">
-        <button class="mapspd" data-b="0.5">0.5c</button>
-        <button class="mapspd" data-b="0.9">0.9c</button>
-        <button class="mapspd" data-b="0.99">0.99c</button>
-        <button class="mapspd active" data-b="0.999">0.999c</button>
-        <button class="mapspd" data-b="0.9999">0.9999c</button>
-      </div>
+      <div class="map-hint">CONTRACTS &amp; TRIP PLANNER · tap a destination — gold routes are your offers, ✓/✗ shows if you can make the run</div>
       <svg id="map-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
       <div id="map-detail"><span class="dim">Tap a destination to plan the leg.</span></div>
       <div id="st-shop"></div>

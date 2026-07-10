@@ -108,7 +108,12 @@ All the visual relativity comes from the SpaceRelativity engine: per-star GLSL
 **length-contraction** view compression, the **CMB hotspot**, proper-acceleration
 **G-forces** (`γ³·dv/dt` linear, `γ²·v·ω` centripetal — turning near *c* is
 punishing, roll is free), and **pilot-frame pacing** (you cover `βγ` ly per ship
-year — length contraction made real, soft-capped for playability).
+year — length contraction made real). Below a soft cap the pace is exact `βγ`;
+past it a slow logarithmic ramp keeps redline speeds covering ground faster
+without a leg ever finishing in a single frame — fast enough that the fastest
+runs really do need the Docking Assist. Time dilation itself (aging `d/βγ`,
+deadlines `d/β`) is exact at every speed and untouched by this — it's wall-clock
+only.
 
 Game-layer physics: fuel as **rapidity** is honest rocketry (velocities don't
 add linearly near *c*; rapidities do), and all three clocks — deadline (universe

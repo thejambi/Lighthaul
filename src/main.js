@@ -210,6 +210,7 @@ const ship = {
 // (soft-capped) — length contraction made real.
 const PROPER_RATE = 0.4;
 const GAMMA_CAP = 40;
+const REDLINE_RAMP = 0.6;     // past the softcap, a slow log climb (see pace()) so redline speeds keep gaining
 const REDLINE_GAMMA = 2000;   // γ above which the HUD SPEED/Lorentz readouts go red + buzz
 
 // Effective speed cap. C_CAP is the stock governor; each Redline Coils level
@@ -224,6 +225,17 @@ function capBeta() { return Math.min(1 - 5e-13, 1 - (1 - C_CAP) * Math.pow(10, -
 // ly/s at saturation) — NOT just age less. Aging (d/βγ) and universe time (d/β)
 // fall out independent of gammaCap, so this only speeds the wall-clock journey.
 function gammaCap() { return GAMMA_CAP * (1 + 0.25 * game.upgrades.overdrive); }
+
+// Effective γ used for coordinate-time / distance accrual (the "pace"). Below the
+// cap it equals the raw γ (true proper velocity βγ). Past the cap the tanh would
+// flat-line, so a slow logarithmic tail keeps redline speeds covering ground
+// faster — noticeably, but so damped a leg can never pass in a single frame.
+// Used by both the flight loop and the autopilot brake-distance sim, so they stay
+// in sync. Aging (d/βγ) and deadlines (d/β) are untouched — this is wall-clock only.
+function pace(gamma) {
+  const gc = gammaCap();
+  return gc * Math.tanh(gamma / gc) + REDLINE_RAMP * gc * Math.log1p(Math.max(0, gamma / gc - 1));
+}
 
 function throttleToBeta(t) {
   t = Math.max(0, Math.min(1, t));
@@ -246,8 +258,7 @@ function apBrakeDistance(beta0, decel) {
   for (let i = 0; i < 2000 && beta > DOCK_BETA; i++) {
     throttle = Math.max(0, throttle - decel * h);
     beta += (throttleToBeta(throttle) - beta) * Math.min(1, h * SPOOL);
-    const gc = gammaCap();
-    const gp = gc * Math.tanh(lorentz(beta) / gc);
+    const gp = pace(lorentz(beta));
     dist += beta * PROPER_RATE * gp * h;
   }
   return dist;
@@ -1715,8 +1726,7 @@ function update(dt) {
   const tgt = c ? stations[c.to] : null;
   let dCoord = 0;
   if (!launching) {
-    const gc = gammaCap();
-    const gPace = gc * Math.tanh(gamma / gc);
+    const gPace = pace(gamma);
     dCoord = PROPER_RATE * gPace * dt;
     ship.pos.addScaledVector(_fwd, ship.beta * dCoord);
     if (!game.testFlight) {                     // test flight doesn't burn the career clock

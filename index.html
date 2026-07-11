@@ -99,6 +99,10 @@
   #contract .row { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.5; gap: 16px; }
   #contract .row .k { color: var(--hud-dim); }
   #contract .row .v { color: var(--hud); font-variant-numeric: tabular-nums; }
+  /* distance is what you watch to time your braking — lift it above the other rows */
+  #contract .row.dist { align-items: baseline; margin: 3px 0; }
+  #contract .row.dist .k { color: var(--hud); }
+  #contract .row.dist .v { color: #fff; font-size: 15px; text-shadow: 0 0 8px rgba(143,233,255,.45); }
   #contract .row .v.pay { color: var(--gold); }
   #contract .row .v.bad { color: var(--warn); }
   #integBar { position: relative; height: 8px; border: 1px solid rgba(143,233,255,.3); border-radius: 4px;
@@ -467,6 +471,7 @@
     #contract { top: auto; bottom: 8px; left: 8px; right: 8px; transform: none; min-width: 0; }
     #contract .dest { font-size: 14px; }
     #contract .row { font-size: 11px; gap: 10px; }
+    #contract .row.dist .v { font-size: 13px; }
 
     /* keyboard cheatsheet is desktop-only; effects toggles are tucked away */
     #help { display: none; }
@@ -591,7 +596,7 @@
     <div id="contract" class="panel">
       <div class="hd">ACTIVE CONTRACT</div>
       <div class="dest" id="c-dest">—</div>
-      <div class="row"><span class="k">distance</span><span class="v" id="c-dist">—</span></div>
+      <div class="row dist"><span class="k">distance</span><span class="v" id="c-dist">—</span></div>
       <div class="row"><span class="k">deadline (universe)</span><span class="v" id="c-deadline">—</span></div>
       <div class="row" id="c-age-row" style="display:none"><span class="k">passenger aged</span><span class="v" id="c-aging">—</span></div>
       <div class="row"><span class="k">inertial rating</span><span class="v" id="c-rating">—</span></div>

@@ -1922,9 +1922,11 @@ function updateHUD(gamma, dist, coordRate) {
     elm.classList.toggle("redline", redline);
     if (redline) elm.style.setProperty("--shake", shake);
   }
+  // SPEED box shows the raw felt G (physics reading, works in a test flight too);
+  // the load-vs-rating gauge lives in the contract box, next to distance.
   const gl = game.contract && game.contract.gLimit;
   const over = gl && dyn.load > gl;
-  hud.gforce.textContent = fmt(dyn.load, 1) + (gl ? " / " + gl + " g" : " g");
+  hud.gforce.textContent = fmt(dyn.load, 1) + " g";
   hud.gforce.style.color = over ? "var(--warn)" : (gl && dyn.load > gl * 0.8) ? "var(--gold)" : "var(--hud)";
   hud.age.textContent = game.pilotAge.toFixed(1) + " yr";
   hud.credits.textContent = "₡" + game.credits;
@@ -1955,7 +1957,9 @@ function updateHUD(gamma, dist, coordRate) {
     hud.cAging.textContent = aged.toFixed(2) + " / " + c.maxAging.toFixed(1) + " yr";
     hud.cAging.className = "v" + (aged > c.maxAging * 0.8 ? " bad" : "");
   }
-  hud.cRating.textContent = c.gLimit + " g";
+  // live load vs the contract's rating — the mission g-gauge, colored as it climbs
+  hud.cRating.textContent = fmt(dyn.load, 1) + " / " + c.gLimit + " g";
+  hud.cRating.style.color = dyn.load > c.gLimit ? "var(--warn)" : (dyn.load > c.gLimit * 0.8 ? "var(--gold)" : "var(--hud)");
   const integPct = Math.round(game.integrity * 100);
   hud.cInteg.textContent = integPct + "%";
   hud.cInteg.className = "v" + (game.integrity < 0.6 ? " bad" : "");

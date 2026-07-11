@@ -212,6 +212,8 @@ const PROPER_RATE = 0.4;
 const GAMMA_CAP = 40;
 const REDLINE_RAMP = 0.25;     // past the softcap, a slow log climb (see pace()) so redline speeds keep gaining
 const REDLINE_GAMMA = 2000;   // γ above which the HUD SPEED/Lorentz readouts go red + buzz
+const HUD_FADE_LO = 0.35;     // below this β the desktop help/effects panels are fully shown...
+const HUD_FADE_HI = 0.85;     // ...above this they've faded away (only after the first delivery)
 
 // Effective speed cap. C_CAP is the stock governor; each Redline Coils level
 // shrinks the remaining gap to c by 10× (adds a nine), so top-throttle γ climbs
@@ -644,6 +646,7 @@ function setPhase(p) {
   game.phase = p;
   for (const [k, s] of Object.entries(screens)) s.classList.toggle("hiddenS", k !== p);
   document.body.classList.toggle("flight", p === "flight");
+  if (p === "flight") { uiHidden = false; el("hud").style.opacity = 1; }   // clear any leftover test-flight hide
   if (p !== "flight") audio.silence();     // don't let the engine drone hang on non-flight screens
   // generate the three contracts once, on arrival — not on every re-render
   // (so refuelling doesn't re-roll the offers)
@@ -1349,7 +1352,7 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Escape") { exitTestFlight(); return; }   // leave a test flight
   keys.add(e.code);
   if (e.code === "Space") e.preventDefault();
-  if (e.code === "KeyH") toggleUI();
+  if (e.code === "KeyH" && game.testFlight) toggleUI();   // hide-all is a test-flight-only view
   if (e.code === "KeyR") callTow();
   if (e.code === "KeyM") { audio.toggleMute(); updateSoundIndicator(); }
   if (e.code === "KeyV") cycleSpeedPreset();
@@ -1588,6 +1591,7 @@ const hud = {
   fxAberr: el("fx-aberr"), fxDoppler: el("fx-doppler"), fxBeam: el("fx-beam"),
   fxContract: el("fx-contract"), fxCmb: el("fx-cmb"),
   countdown: el("countdown"), targetArrow: el("targetArrow"),
+  help: el("help"), effects: el("effects"),
 };
 const flashEl = el("flash");
 const gveilEl = el("gveil");
@@ -1871,6 +1875,17 @@ function update(dt) {
 }
 
 function updateHUD(gamma, dist, coordRate) {
+  // Desktop help + effects panels fade out as you build speed — but only after
+  // your first delivery (a new pilot keeps them the whole first flight). A test
+  // flight leaves them alone; there the H key hides the whole HUD instead.
+  const hudFade = game.testFlight ? 1
+    : game.deliveries >= 1
+      ? THREE.MathUtils.clamp((HUD_FADE_HI - ship.beta) / (HUD_FADE_HI - HUD_FADE_LO), 0, 1)
+      : 1;
+  hud.help.style.opacity = hudFade;
+  hud.effects.style.opacity = hudFade;
+  hud.effects.style.pointerEvents = hudFade < 0.2 ? "none" : "";   // don't catch clicks once gone
+
   const pctC = ship.beta * 100;
   hud.pct.textContent = (pctC >= 99.99 ? fmt(pctC, 4) : fmt(pctC, 3)) + " %c";
   hud.beta.textContent = ship.beta.toFixed(ship.beta > 0.999 ? 7 : 6);

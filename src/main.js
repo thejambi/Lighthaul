@@ -647,6 +647,7 @@ function setPhase(p) {
   for (const [k, s] of Object.entries(screens)) s.classList.toggle("hiddenS", k !== p);
   document.body.classList.toggle("flight", p === "flight");
   if (p === "flight") { uiHidden = false; el("hud").style.opacity = 1; setFlightHelp(); }   // clear leftover hide; set the cheat-sheet
+  if (p !== "flight") document.body.classList.remove("deadstick");
   if (p !== "flight") audio.silence();     // don't let the engine drone hang on non-flight screens
   // generate the three contracts once, on arrival — not on every re-render
   // (so refuelling doesn't re-roll the offers)
@@ -1906,6 +1907,9 @@ function updateHUD(gamma, dist, coordRate) {
   hud.effects.style.opacity = hudFade;
   hud.effects.style.pointerEvents = hudFade < 0.2 ? "none" : "";   // don't catch clicks once gone
 
+  // dead stick: surface the TOW recovery button on desktop too (mobile always shows it)
+  document.body.classList.toggle("deadstick", !game.testFlight && game.fuel <= 0);
+
   const pctC = ship.beta * 100;
   hud.pct.textContent = (pctC >= 99.99 ? fmt(pctC, 4) : fmt(pctC, 3)) + " %c";
   hud.beta.textContent = ship.beta.toFixed(ship.beta > 0.999 ? 7 : 6);
@@ -1969,6 +1973,10 @@ function updateHUD(gamma, dist, coordRate) {
   if (game.preflight > 0) {
     status = bearing > 0.985 ? "◈ ON TARGET — hold" : "◷ AIM AT THE MARKER";
     cls = "dockable";
+  } else if (game.fuel <= 0) {
+    // dead stick trumps everything — you can't thrust, so the tow is the only move
+    status = "⚠ OUT OF FUEL — call a tow to recover";
+    cls = "brake";
   } else if (dyn.load > c.gLimit) {
     status = "⚠ OVER INERTIAL RATING — ease off";
     cls = "brake";
@@ -1983,9 +1991,6 @@ function updateHUD(gamma, dist, coordRate) {
     cls = "dockable";
   } else if (dist < brakeDist) {
     status = "⚠ CUT THROTTLE — braking distance";
-    cls = "brake";
-  } else if (game.fuel <= 0) {
-    status = "FUEL EXPENDED — call a tow (R / button)";
     cls = "brake";
   }
   hud.cStatus.textContent = status;

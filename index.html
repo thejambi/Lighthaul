@@ -142,13 +142,16 @@
   #throttleWrap .pct { font-size: 11px; margin-top: 6px; color: var(--hud); }
 
   /* touch action buttons — desktop hides these (keyboard R / M cover them) */
-  #actions { position: absolute; display: none; flex-direction: column; gap: 8px; z-index: 3; }
+  #actions { position: absolute; display: none; flex-direction: column; gap: 8px; z-index: 3;
+    top: 286px; right: 14px; width: 60px; }              /* desktop position (below the throttle) */
   #actions button { pointer-events: auto; cursor: pointer; font: inherit; font-size: 12px;
     letter-spacing: 1px; color: var(--hud); background: rgba(8,20,28,.75);
     border: 1px solid rgba(143,233,255,.35); border-radius: 8px; padding: 10px 0; text-align: center;
     backdrop-filter: blur(3px); }
   #actions #btn-tow { color: var(--warn); border-color: rgba(255,106,90,.45); }
   #actions #btn-tow.armed { color: #fff; background: rgba(122,27,27,.8); animation: pulse .6s infinite; }
+  #btn-mute { display: none; }                            /* desktop uses the M key; mobile shows the button */
+  body.deadstick #actions { display: flex; }              /* stranded: surface the TOW button on desktop too */
 
   #reticle { position: absolute; top: 50%; left: 50%; width: 42px; height: 42px; transform: translate(-50%,-50%); opacity: .5; }
   #reticle::before, #reticle::after { content:""; position:absolute; background: rgba(143,233,255,.55); }
@@ -459,6 +462,7 @@
 
     /* tow + mute reachable below the throttle */
     #actions { display: flex; top: calc(44vh + 22px); right: 6px; width: 56px; }
+    #btn-mute { display: block; }
 
     #contract { top: auto; bottom: 8px; left: 8px; right: 8px; transform: none; min-width: 0; }
     #contract .dest { font-size: 14px; }

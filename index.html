@@ -421,6 +421,10 @@
   .alltime { margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(143,233,255,.15);
     font-size: 12px; color: var(--hud-dim); }
   .alltime b { color: var(--hud); }
+  .title-beats { text-align: left; max-width: 470px; margin: 16px auto 4px; display: flex; flex-direction: column; gap: 9px; }
+  .title-beats > div { position: relative; padding-left: 16px; font-size: 13px; line-height: 1.6; color: var(--hud-dim); }
+  .title-beats > div::before { content: "›"; position: absolute; left: 0; color: var(--gold); }
+  .title-beats b { color: var(--hud); }
   .title-records { margin: 14px auto 2px; padding: 8px 14px; font-size: 12px; color: var(--hud-dim);
     border: 1px solid rgba(143,233,255,.18); border-radius: 8px; background: rgba(0,0,0,.25); display: inline-block; }
   .title-records .k { color: var(--hud-dim); }
@@ -475,10 +479,12 @@
     <div class="card" style="text-align:center">
       <h1>LIGHTHAUL</h1>
       <p style="margin-top:2px; letter-spacing:2px; color:var(--hud)">A RELATIVISTIC COURIER GAME</p>
-      <p>Haul cargo and passengers between stations at a hair under light speed.
-         <b>Fuel is Δv</b> — it diverges toward <i>c</i>, the tank is small, and you pay again to brake, so fly only as fast as the job needs.
-         <b>Deadlines run on universe time</b> · <b>passengers age on ship time</b> (keep γ high) · <b>and so do you</b> — retire rich, not old.
-         Your <b>inertial dampers</b> cancel the brutal G of cruising, but hard burns and hard braking still stress the load — respect each contract's <b>inertial rating</b> or arrive with damaged goods.</p>
+      <p style="margin-bottom:2px">Haul cargo and passengers between stations at a hair under light speed — and let special relativity be the economy.</p>
+      <div class="title-beats">
+        <div><b>Fuel is Δv</b> — the tank is small and you pay again to brake, so fly only as fast as the job needs.</div>
+        <div><b>Deadlines run on universe time</b> — cruise too slowly and you miss them.</div>
+        <div><b>You and your passengers age on ship time</b> — fly high-γ to stay young. Retire rich, not old.</div>
+      </div>
       <div id="title-records" class="title-records" style="display:none"></div>
       <div class="go" id="title-go">▶ click or press any key to report for duty</div>
     </div>
@@ -508,7 +514,7 @@
       <div id="st-lowfuel" class="lowfuel" style="display:none"></div>
       <div class="map-hint">CONTRACTS &amp; TRIP PLANNER · tap a destination — gold routes are your offers, ✓/✗ shows if you can make the run</div>
       <svg id="map-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
-      <div id="map-detail"><span class="dim">Tap a destination to plan the leg.</span></div>
+      <div id="map-detail"><span class="dim">Tap a destination to plan the run.</span></div>
       <div id="st-shop"></div>
       <div style="margin-top:14px">
         <button class="btn gold" id="st-refuel">REFUEL</button>

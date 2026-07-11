@@ -706,7 +706,7 @@ function buildStation() {
     selectMapNode(mapSelected);
   } else {
     buildStarMap();
-    el("map-detail").innerHTML = '<span class="dim">Tap a destination — for a contract you\'ll see the minimum speed it needs and whether you can make the run.</span>';
+    el("map-detail").innerHTML = '<span class="dim">Tap a destination to plan the run.</span>';
   }
 
   buildShop();

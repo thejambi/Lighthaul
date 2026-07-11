@@ -646,7 +646,7 @@ function setPhase(p) {
   game.phase = p;
   for (const [k, s] of Object.entries(screens)) s.classList.toggle("hiddenS", k !== p);
   document.body.classList.toggle("flight", p === "flight");
-  if (p === "flight") { uiHidden = false; el("hud").style.opacity = 1; }   // clear any leftover test-flight hide
+  if (p === "flight") { uiHidden = false; el("hud").style.opacity = 1; setFlightHelp(); }   // clear leftover hide; set the cheat-sheet
   if (p !== "flight") audio.silence();     // don't let the engine drone hang on non-flight screens
   // generate the three contracts once, on arrival — not on every re-render
   // (so refuelling doesn't re-roll the offers)
@@ -1355,7 +1355,7 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyH" && game.testFlight) toggleUI();   // hide-all is a test-flight-only view
   if (e.code === "KeyR") callTow();
   if (e.code === "KeyM") { audio.toggleMute(); updateSoundIndicator(); }
-  if (e.code === "KeyV") cycleSpeedPreset();
+  if (e.code === "KeyV" && game.testFlight) cycleSpeedPreset();   // speed presets: test-flight only
   if (e.code === "Digit1") fx.aberration ^= 1;
   if (e.code === "Digit2") fx.doppler ^= 1;
   if (e.code === "Digit3") fx.beaming ^= 1;
@@ -1551,6 +1551,26 @@ function toggleUI() {
   uiHidden = !uiHidden;
   el("hud").style.opacity = uiHidden ? 0.06 : 1;
 }
+
+// The flight controls cheat-sheet. A delivery run shows only the mission
+// essentials (steer, aim, throttle, tow, mute); a test flight shows the full
+// key list since everything's fair game there. Q/E roll and 1–5 effects still
+// work in a delivery run — they're just not advertised.
+function setFlightHelp() {
+  const t = el("help");
+  if (game.testFlight) {
+    t.innerHTML = `<div class="title">FLIGHT CONTROLS</div>` +
+      `<b>Mouse</b> steer (drag) · <b>tap</b> a marker to auto-aim · <b>W/S</b> throttle ± · <b>Q/E</b> roll · <b>Shift</b> turbo · <b>X</b> warp<br/>` +
+      `<b>Space</b> cut thrust · <b>V</b> speed presets · <b>B</b> (hold) look astern<br/>` +
+      `<b>R</b> call tow · <b>M</b> mute · <b>H</b> hide UI · <b>1–5</b> toggle effects`;
+  } else {
+    const warp = game.upgrades.overdrive > 0 ? " · <b>X</b> warp" : "";
+    t.innerHTML = `<div class="title">FLIGHT CONTROLS</div>` +
+      `<b>Mouse</b> steer (drag) · <b>tap</b> a marker to auto-aim<br/>` +
+      `<b>W/S</b> throttle ± · <b>Shift</b> turbo${warp}<br/>` +
+      `<b>R</b> call tow · <b>M</b> mute`;
+  }
+}
 function updateSoundIndicator() {
   const s = el("sound-state");
   if (s) s.textContent = audio.isMuted() ? "muted" : "on";
@@ -1679,7 +1699,7 @@ function update(dt) {
   // a warp burn (keyboard X, or the warp thrust-bar band) also spools the drive
   // harder below, so the speed itself climbs faster — not just the lever
   const warpBurn = warpKey || Math.abs(touchThrottleRate) > 1.0;
-  if (keys.has("Space")) ship.throttle = 0;
+  if (keys.has("Space") && game.testFlight) ship.throttle = 0;   // cut thrust: test-flight only
   ship.throttle = Math.max(0, Math.min(1, ship.throttle));
 
   // dead stick: out of fuel = no thrust = you coast at your current beta
@@ -1841,7 +1861,7 @@ function update(dt) {
   dyn.veil = Math.min(0.6, feltSurge * 0.55 + Math.pow(ship.beta, 6) * 0.12);
 
   // --- look astern ---
-  const targetYaw = keys.has("KeyB") ? Math.PI : 0;
+  const targetYaw = (keys.has("KeyB") && game.testFlight) ? Math.PI : 0;   // look astern: test-flight only
   view.lookYaw += (targetYaw - view.lookYaw) * Math.min(1, dt * 5);
 
   // --- camera ---

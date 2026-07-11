@@ -1613,6 +1613,7 @@ const hud = {
   fxContract: el("fx-contract"), fxCmb: el("fx-cmb"),
   countdown: el("countdown"), targetArrow: el("targetArrow"),
   help: el("help"), effects: el("effects"),
+  smDist: el("sm-dist"), smLoad: el("sm-load"),
 };
 const flashEl = el("flash");
 const gveilEl = el("gveil");
@@ -1946,9 +1947,12 @@ function updateHUD(gamma, dist, coordRate) {
 
   // contract tracker — hidden in a free test flight (no contract)
   const c = game.contract;
-  if (!c) { el("contract").style.display = "none"; hud.countdown.style.display = "none"; return; }
+  if (!c) { el("contract").style.display = "none"; el("flight-summary").style.display = "none"; hud.countdown.style.display = "none"; return; }
   el("contract").style.display = "";
-  hud.cDist.textContent = dist.toFixed(1) + " ly";
+  el("flight-summary").style.display = "";   // "" reverts to CSS (mobile block, desktop none)
+  // distance also echoes into the mobile top-center summary (prominent there too)
+  const distTxt = dist.toFixed(1) + " ly";
+  hud.cDist.textContent = distTxt; hud.smDist.textContent = distTxt;
   const remaining = c.deadline - (ship.coordTime - c.acceptCoord);
   hud.cDeadline.textContent = "T−" + fmtY(Math.max(0, remaining));
   hud.cDeadline.className = "v" + (remaining < c.deadline * 0.15 ? " bad" : "");
@@ -1957,9 +1961,12 @@ function updateHUD(gamma, dist, coordRate) {
     hud.cAging.textContent = aged.toFixed(2) + " / " + c.maxAging.toFixed(1) + " yr";
     hud.cAging.className = "v" + (aged > c.maxAging * 0.8 ? " bad" : "");
   }
-  // live load vs the contract's rating — the mission g-gauge, colored as it climbs
-  hud.cRating.textContent = fmt(dyn.load, 1) + " / " + c.gLimit + " g";
-  hud.cRating.style.color = dyn.load > c.gLimit ? "var(--warn)" : (dyn.load > c.gLimit * 0.8 ? "var(--gold)" : "var(--hud)");
+  // live load vs the contract's rating — the mission g-gauge, colored as it climbs;
+  // mirrored into the summary so the g-limit is visible top-center on mobile
+  const loadTxt = fmt(dyn.load, 1) + " / " + c.gLimit + " g";
+  const loadColor = dyn.load > c.gLimit ? "var(--warn)" : (dyn.load > c.gLimit * 0.8 ? "var(--gold)" : "var(--hud)");
+  hud.cRating.textContent = loadTxt; hud.cRating.style.color = loadColor;
+  hud.smLoad.textContent = loadTxt; hud.smLoad.style.color = loadColor;
   const integPct = Math.round(game.integrity * 100);
   hud.cInteg.textContent = integPct + "%";
   hud.cInteg.className = "v" + (game.integrity < 0.6 ? " bad" : "");

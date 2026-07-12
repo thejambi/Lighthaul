@@ -221,7 +221,7 @@ const ship = {
 // (soft-capped) — length contraction made real.
 const PROPER_RATE = 0.4;
 const GAMMA_CAP = 40;
-const REDLINE_RAMP = 0.25;     // past the softcap, a slow log climb (see pace()) so redline speeds keep gaining
+const REDLINE_RAMP = 0.5;     // past the softcap, a slow log climb (see pace()) so redline speeds keep gaining
 const REDLINE_GAMMA = 2000;   // γ above which the HUD SPEED/Lorentz readouts go red + buzz
 // Deep Space License: complete a delivery having touched this γ (needs Redline
 // Coils L3+ — stock tops out at γ 1000) and long-haul brokers open up.
@@ -704,19 +704,28 @@ function makeOffer(fromIdx, t) {
 function makeContracts(fromIdx) {
   const offers = [];
   const used = new Set([fromIdx]);
-  // three offers within the core cluster
+  // Always three offers on the board. Licensed docks mix in the deep halo —
+  // randomly 1 or 2 long-haul slots; the rest stay core-cluster work.
+  const nLong = game.deepLicense ? 1 + ((rng() * 2) | 0) : 0;
   let guard = 0;
-  while (offers.length < 3 && guard++ < 200) {
+  while (offers.length < 3 - nLong && guard++ < 200) {
     const t = (rng() * stations.length) | 0;
     if (used.has(t) || stations[t].deep) continue;
     used.add(t);
     offers.push(makeOffer(fromIdx, t));
   }
-  // licensed: two long-haul offers out to the deep halo
-  if (game.deepLicense) {
+  if (nLong) {
     const deepIdx = stations.map((s, i) => (s.deep && i !== fromIdx ? i : -1)).filter((i) => i >= 0);
-    while (offers.length < 5 && deepIdx.length) {
+    while (offers.length < 3 && deepIdx.length) {
       const t = deepIdx.splice((rng() * deepIdx.length) | 0, 1)[0];
+      offers.push(makeOffer(fromIdx, t));
+    }
+    // deep neighbours ran short (e.g. docked out in the halo) — top up with core
+    guard = 0;
+    while (offers.length < 3 && guard++ < 200) {
+      const t = (rng() * stations.length) | 0;
+      if (used.has(t) || stations[t].deep) continue;
+      used.add(t);
       offers.push(makeOffer(fromIdx, t));
     }
   }
@@ -998,28 +1007,55 @@ function buildStarMap() {
   });
 
   // Deep-space stations (licensed only): pinned to the chart border along their
-  // true bearing from the cluster centre — signposts pointing off the map.
+  // true bearing from the cluster centre — signposts pointing off the map. Each
+  // marker carries a label stack (name · distance · contract), so its footprint
+  // dodges the core labels (already in `placed`) and earlier markers by sliding
+  // along the border until it finds clear sky; the chosen box joins `placed`.
   const deeps = [];
   if (game.deepLicense) {
     const m = 10;
     stations.forEach((s, i) => { if (s.deep) deeps.push([s, i]); });
-    for (const [s] of deeps) {
+    for (const [s, i] of deeps) {
       const dx = s.pos.x - cx, dz = s.pos.z - cz;
       const len = Math.hypot(dx, dz) || 1;
       const ux = dx / len, uz = dz / len;
       const tX = ux > 1e-6 ? (W - m - W / 2) / ux : ux < -1e-6 ? (m - W / 2) / ux : Infinity;
       const tY = uz > 1e-6 ? (H - m - H / 2) / uz : uz < -1e-6 ? (m - H / 2) / uz : Infinity;
       const t = Math.min(tX, tY);
-      s._mx = W / 2 + ux * t; s._my = H / 2 + uz * t;
-      s._vert = tX < tY;                     // pinned to a left/right border
-    }
-    // separate markers that landed on the same stretch of border
-    for (let a = 0; a < deeps.length; a++) for (let b = a + 1; b < deeps.length; b++) {
-      const A = deeps[a][0], B = deeps[b][0];
-      if (Math.abs(A._mx - B._mx) < 16 && Math.abs(A._my - B._my) < 13) {
-        if (B._vert) B._my = THREE.MathUtils.clamp(B._my + 15, m, H - m);
-        else B._mx = THREE.MathUtils.clamp(B._mx + 22, m, W - m);
+      const bx = W / 2 + ux * t, by = H / 2 + uz * t;
+      const vert = tX < tY;                  // pinned to a left/right border
+      // label footprint at a candidate border point — mirrors the render layout
+      const c = game.offers.find((o) => o.to === i);
+      const w = Math.max(3 + s.name.replace(_SUFFIX_RE, "").length * 1.9, c ? 24 : 14);
+      const rows = c ? 3 : 2;
+      const boxAt = (px, py) => {
+        if (vert) {
+          const y0 = THREE.MathUtils.clamp(py - 1, 4.5, H - 3 - rows * 3.6);
+          return px > W / 2
+            ? { x1: px - 4 - w, y1: y0 - 3, x2: px + 2, y2: y0 + (rows - 1) * 3.6 + 1 }
+            : { x1: px - 2, y1: y0 - 3, x2: px + 4 + w, y2: y0 + (rows - 1) * 3.6 + 1 };
+        }
+        const lx = THREE.MathUtils.clamp(px, 20, W - 20);
+        if (py < H / 2) return { x1: lx - w / 2, y1: py - 2, x2: lx + w / 2, y2: py + 5 + (rows - 1) * 3.6 + 1 };
+        return { x1: lx - w / 2, y1: py - 6 - (rows - 1) * 3.6, x2: lx + w / 2, y2: py + 2 };
+      };
+      // slide along the border, nearest-to-bearing first, to the first clear
+      // spot; on a crowded border, settle for the least-overlapping candidate
+      const ovl = (b) => placed.reduce((a, o) => {
+        const ow = Math.min(b.x2, o.x2) - Math.max(b.x1, o.x1);
+        const oh = Math.min(b.y2, o.y2) - Math.max(b.y1, o.y1);
+        return a + (ow > 0 && oh > 0 ? ow * oh : 0);
+      }, 0);
+      let best = null;
+      for (const off of [0, 9, -9, 18, -18, 27, -27, 36, -36, 45, -45, 54, -54, 63, -63, 72, -72]) {
+        const qx = vert ? bx : THREE.MathUtils.clamp(bx + off, m, W - m);
+        const qy = vert ? THREE.MathUtils.clamp(by + off, m, H - m) : by;
+        const a = ovl(boxAt(qx, qy));
+        if (!best || a < best.a) best = { qx, qy, a };
+        if (a === 0) break;
       }
+      s._mx = best.qx; s._my = best.qy; s._vert = vert;
+      placed.push(boxAt(best.qx, best.qy));
     }
   }
 

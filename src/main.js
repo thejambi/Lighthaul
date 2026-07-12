@@ -606,6 +606,7 @@ function placeStations(seed) {
       st = stations[i] = { el: div, dEl: div.querySelector(".d") };
     }
     st.name = b.name; st.pos = b.pos; st.shop = b.shop; st.deep = !!b.deep;
+    st._shown = true;   // no inline display yet = visible; first label pass may need to hide it
     st.el.querySelector(".nm").textContent = b.name;
   });
   // drop leftovers when a re-seed produced fewer stations (deep count varies 3–4)
@@ -1820,7 +1821,11 @@ const hud = {
   countdown: el("countdown"), targetArrow: el("targetArrow"),
   help: el("help"), effects: el("effects"),
   smDist: el("sm-dist"), smLoad: el("sm-load"),
+  contract: el("contract"), summary: el("flight-summary"),
 };
+const _redlineEls = [hud.pct, hud.gamma];   // hoisted — no per-frame array
+let lastHudFade = -1;                       // last help/effects opacity actually written
+let audioTick = 0;                          // audio.update runs every 3rd frame
 const flashEl = el("flash");
 const gveilEl = el("gveil");
 const viewmodeEl = el("viewmode");
@@ -1867,8 +1872,12 @@ function stationAtScreen(px, py, radius) {
   }
   return best;
 }
+// fmt runs several times per frame in the HUD — memoize one Intl formatter per
+// precision instead of paying toLocaleString's option-parsing on every call.
+const _nf = {};
 function fmt(n, d = 1) {
-  return n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+  return (_nf[d] || (_nf[d] = new Intl.NumberFormat(undefined,
+    { minimumFractionDigits: d, maximumFractionDigits: d }))).format(n);
 }
 
 const view = { lookYaw: 0 };
@@ -2095,7 +2104,9 @@ function update(dt) {
   updateHUD(gamma, dist, dCoord / Math.max(dt, 1e-4));
   updateLabels();
   updateTargetArrow();
-  audio.update(ship.beta, ship.throttle, 0, feltSurge);
+  // ~20 Hz is plenty for the audio smoothing (0.1–0.3 s time constants) and cuts
+  // the AudioParam automation-event churn to a third
+  if (++audioTick >= 3) { audioTick = 0; audio.update(ship.beta, ship.throttle, 0, feltSurge); }
 
   gveilEl.style.opacity = dyn.veil.toFixed(3);
   viewmodeEl.classList.toggle("on", view.lookYaw > 0.4);
@@ -2113,9 +2124,12 @@ function updateHUD(gamma, dist, coordRate) {
     : game.deliveries >= 1
       ? THREE.MathUtils.clamp((HUD_FADE_HI - ship.beta) / (HUD_FADE_HI - HUD_FADE_LO), 0, 1)
       : 1;
-  hud.help.style.opacity = hudFade;
-  hud.effects.style.opacity = hudFade;
-  hud.effects.style.pointerEvents = hudFade < 0.2 ? "none" : "";   // don't catch clicks once gone
+  if (hudFade !== lastHudFade) {           // pinned at 1 (or 0) most of the flight — skip the writes
+    lastHudFade = hudFade;
+    hud.help.style.opacity = hudFade;
+    hud.effects.style.opacity = hudFade;
+    hud.effects.style.pointerEvents = hudFade < 0.2 ? "none" : "";   // don't catch clicks once gone
+  }
 
   // dead stick: surface the TOW recovery button on desktop too (mobile always shows it)
   document.body.classList.toggle("deadstick", !game.testFlight && game.fuel <= 0);
@@ -2128,7 +2142,7 @@ function updateHUD(gamma, dist, coordRate) {
   // buzz, harder the deeper into the redline you push
   const redline = gamma > REDLINE_GAMMA;
   const shake = redline ? Math.min(1.15, 0.4 + 0.28 * Math.log10(gamma / REDLINE_GAMMA)).toFixed(2) : 0;
-  for (const elm of [hud.pct, hud.gamma]) {
+  for (const elm of _redlineEls) {
     elm.classList.toggle("redline", redline);
     if (redline) elm.style.setProperty("--shake", shake);
   }
@@ -2156,9 +2170,16 @@ function updateHUD(gamma, dist, coordRate) {
 
   // contract tracker — hidden in a free test flight (no contract)
   const c = game.contract;
-  if (!c) { el("contract").style.display = "none"; el("flight-summary").style.display = "none"; hud.countdown.style.display = "none"; return; }
-  el("contract").style.display = "";
-  el("flight-summary").style.display = "";   // "" reverts to CSS (mobile block, desktop none)
+  if (!c) {
+    if (hud.contract.style.display !== "none") {
+      hud.contract.style.display = "none"; hud.summary.style.display = "none"; hud.countdown.style.display = "none";
+    }
+    return;
+  }
+  if (hud.contract.style.display !== "") {
+    hud.contract.style.display = "";
+    hud.summary.style.display = "";   // "" reverts to CSS (mobile block, desktop none)
+  }
   // distance also echoes into the mobile top-center summary (prominent there too)
   const distTxt = dist.toFixed(1) + " ly";
   hud.cDist.textContent = distTxt; hud.smDist.textContent = distTxt;
@@ -2216,29 +2237,37 @@ function updateHUD(gamma, dist, coordRate) {
   hud.cStatus.textContent = status;
   hud.cStatus.className = "status " + cls;
 
-  // pre-launch countdown overlay
+  // pre-launch countdown overlay — the DOM only rebuilds when the digit flips,
+  // not every frame (innerHTML parsing 60×/s was the HUD's biggest churn)
   if (game.preflight > 0) {
-    hud.countdown.style.display = "block";
-    hud.countdown.innerHTML = `<div class="cd-num">${Math.ceil(game.preflight)}</div>` +
-      `<div class="cd-hint">AIM AT ${stations[c.to].name}</div>` +
-      `<div class="cd-sub">thrust when you're ready to launch</div>`;
+    const sec = Math.ceil(game.preflight);
+    if (hud.countdown.style.display !== "block") hud.countdown.style.display = "block";
+    if (cdSec !== sec) {
+      cdSec = sec;
+      hud.countdown.innerHTML = `<div class="cd-num">${sec}</div>` +
+        `<div class="cd-hint">AIM AT ${stations[c.to].name}</div>` +
+        `<div class="cd-sub">thrust when you're ready to launch</div>`;
+    }
   } else if (hud.countdown.style.display !== "none") {
     hud.countdown.style.display = "none";
+    cdSec = -1;                            // next launch rebuilds (new destination name)
   }
 }
+let cdSec = -1;
 
 function updateLabels() {
   const labelFade = 1 - THREE.MathUtils.smoothstep(ship.beta, 0.9, 0.97);
   for (let i = 0; i < stations.length; i++) {
     const st = stations[i];
+    // hidden labels skip the DOM write unless they were visible last frame
     // deep-space stations stay off the nav display until the license is earned
-    if (st.deep && !game.deepLicense) { st.el.style.display = "none"; continue; }
+    if (st.deep && !game.deepLicense) { if (st._shown) { st.el.style.display = "none"; st._shown = false; } continue; }
     const isTarget = game.contract && game.contract.to === i;
     // the target label stays visible at any speed; others fade near c
     const fade = isTarget ? 1 : labelFade;
-    if (fade <= 0.001) { st.el.style.display = "none"; continue; }
+    if (fade <= 0.001) { if (st._shown) { st.el.style.display = "none"; st._shown = false; } continue; }
     const dist = st.pos.distanceTo(ship.pos);
-    if (dist < 1e-3) { st.el.style.display = "none"; continue; }
+    if (dist < 1e-3) { if (st._shown) { st.el.style.display = "none"; st._shown = false; } continue; }
     // Project the TRUE station position (not aberrated). A nav marker should read
     // as an honest bearing: it swings to the edge and off-screen as you fly past,
     // instead of aberration pinning it to the forward cone so you can't tell you
@@ -2248,11 +2277,12 @@ function updateLabels() {
     // (x is tighter because the labels are wide horizontal text)
     if (_proj.z > 1 || _proj.z < -1 ||
         _proj.x < -0.9 || _proj.x > 0.9 || _proj.y < -0.96 || _proj.y > 0.96) {
-      st.el.style.display = "none"; continue;
+      if (st._shown) { st.el.style.display = "none"; st._shown = false; }
+      continue;
     }
     const x = (_proj.x * 0.5 + 0.5) * window.innerWidth;
     const y = (-_proj.y * 0.5 + 0.5) * window.innerHeight;
-    st.el.style.display = "block";
+    if (!st._shown) { st.el.style.display = "block"; st._shown = true; }
     st.el.style.opacity = fade.toFixed(3);
     st.el.style.left = x + "px";
     st.el.style.top = y + "px";
@@ -2300,6 +2330,6 @@ window.addEventListener("resize", () => {
 });
 
 // debug hook for automated testing (not used by gameplay)
-window.__lighthaul = { game, ship, stations, dock, setPhase };
+window.__lighthaul = { game, ship, stations, dock, setPhase, update };
 
 requestAnimationFrame(frame);

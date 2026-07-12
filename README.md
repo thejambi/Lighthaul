@@ -81,9 +81,10 @@ worth of years. Deep space is where the full build — tank, drive, coils,
 docking assist — finally flies as one machine.
 
 **Records & rank.** Retire and you earn a rank on your final balance — from
-*Deadhead* to *Lightspeed Legend* — and your best careers (richest retirement,
-most deliveries, highest Lorentz γ ever reached) persist as records to beat on
-your next run.
+*Deadhead* through *Lightspeed Legend* and, for the deep-space eras, up to
+*Redline Royalty*, *Deep Space Magnate*, and *The Ageless* — and your best
+careers (richest retirement, most deliveries, highest Lorentz γ ever reached)
+persist as records to beat on your next run.
 
 **Star chart.** The dock's contract browser *is* a top-down map of the cluster:
 your three offers appear as gold routes, each labelled with its pay and g-rating

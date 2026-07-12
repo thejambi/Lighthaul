@@ -169,6 +169,11 @@ const game = {
 // the game's whole pitch is "retire rich", and the nest egg is what you keep.
 const RECORDS_KEY = "lighthaul.records.v1";
 const RANKS = [        // final-balance thresholds → title (tune after playtesting)
+  // the redline tiers: only a Deep Space License era of long hauls climbs here
+  [128000, "The Ageless"],
+  [64000,  "Deep Space Magnate"],
+  [32000,  "Redline Royalty"],
+  // reachable on core-cluster work alone
   [16000, "Lightspeed Legend"],
   [10000, "Void Baron"],
   [6000,  "Master Courier"],
@@ -177,6 +182,11 @@ const RANKS = [        // final-balance thresholds → title (tune after playtes
   [0,     "Deadhead"],
 ];
 function rankFor(bal) { return (RANKS.find(([m]) => bal >= m) || RANKS[RANKS.length - 1])[1]; }
+// the rank above the one earned (null at the top) — shown as a target at retirement
+function nextRank(bal) {
+  const i = RANKS.findIndex(([m]) => bal >= m);
+  return i > 0 ? RANKS[i - 1] : null;
+}
 const records = Object.assign(
   { bestBalance: 0, bestEarned: 0, mostDeliveries: 0, topGamma: 0, careers: 0 },
   (() => { try { return JSON.parse(localStorage.getItem(RECORDS_KEY)) || {}; } catch (_) { return {}; } })()
@@ -1393,8 +1403,10 @@ function buildGameOver() {
   updateTitleRecords();
   const star = (on) => on ? ` <span class="rec-new">★ record</span>` : "";
   el("go-title").textContent = forced ? "Mandatory retirement" : "Retired";
+  const nxt = nextRank(game.credits);
   el("go-body").innerHTML =
-    `<div class="rank">rank earned · <b class="gold-t">${rankFor(game.credits)}</b></div>` +
+    `<div class="rank">rank earned · <b class="gold-t">${rankFor(game.credits)}</b>` +
+    (nxt ? `<span class="rank-next">next · ${nxt[1]} at ₡${nxt[0].toLocaleString()}</span>` : "") + `</div>` +
     `You hung up the flight suit at <b>${game.pilotAge.toFixed(1)}</b>, flying the <b>${shipCls().name}</b>.<br/>` +
     `While you flew, the universe aged <b>${fmtY(ship.coordTime)}</b> — ` +
     `you lived <b>${fmtY(ship.shipTime)}</b> of it aboard.<br/>` +

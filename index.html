@@ -397,6 +397,7 @@
     border: 1px solid rgba(143,233,255,.18); border-radius: 8px; pointer-events: auto; }
   .map-edge { stroke: rgba(255,215,106,.35); stroke-width: .4; }
   .map-edge.sel { stroke: var(--gold); stroke-width: .7; }
+  .map-edge.deep { stroke-dasharray: 2 1.6; }   /* long-haul routes run off the chart */
   /* each station is a big invisible hit-group — node, label, and padding all tappable */
   .map-hit { cursor: pointer; }
   .map-hit .hit { fill: none; pointer-events: all; }
@@ -406,6 +407,11 @@
   .map-node.dest { fill: var(--gold); }
   .map-node.dock { fill: #fff; }
   .map-node.sel { stroke: #fff; stroke-width: .8; }
+  /* deep-space edge markers: hollow rings pointing off-chart */
+  .map-node.deepring { fill: #0a1822; stroke: var(--hud-dim); stroke-width: .6; }
+  .map-node.deepring.dest { stroke: var(--gold); }
+  .map-node.deepring.dock { stroke: #fff; }
+  .map-node.deepring.sel { stroke: #fff; stroke-width: .9; }
   .map-label { font-size: 3px; fill: var(--hud-dim); font-family: inherit; }
   .map-label.dest { fill: var(--gold); }
   .map-label.dock { fill: #fff; }
@@ -413,6 +419,7 @@
   .map-sub { font-size: 2.6px; font-family: inherit; }
   .map-sub.ok { fill: var(--ok); }
   .map-sub.no { fill: var(--warn); }
+  .map-sub.dim { fill: var(--hud-dim); }
   #map-detail { margin: 10px 0; font-size: 12.5px; line-height: 1.7; min-height: 66px; color: var(--hud); }
   #map-detail .dim { color: var(--hud-dim); }
   #map-detail .k { color: var(--hud-dim); }

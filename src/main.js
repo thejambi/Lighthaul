@@ -159,6 +159,7 @@ const game = {
   testFlight: false,          // free-flight sandbox — no contract, clock, fuel, or damage
   debug: false,               // play-test mode: free upgrades + teleport (armed at ship-select)
   maxGamma: 1,                // highest Lorentz factor reached this career (a persisted record)
+  deepLicense: false,         // earned by delivering after touching γ ≥ DEEP_GAMMA — opens long-haul space
   upgrades: { tank: 0, drive: 0, damper: 0, broker: 0, rejuv: 0, overdrive: 0, autopilot: 0 },
   lastResult: null,
 };
@@ -212,6 +213,11 @@ const PROPER_RATE = 0.4;
 const GAMMA_CAP = 40;
 const REDLINE_RAMP = 0.25;     // past the softcap, a slow log climb (see pace()) so redline speeds keep gaining
 const REDLINE_GAMMA = 2000;   // γ above which the HUD SPEED/Lorentz readouts go red + buzz
+// Deep Space License: complete a delivery having touched this γ (needs Redline
+// Coils L3+ — stock tops out at γ 1000) and long-haul brokers open up.
+const DEEP_GAMMA = 25000;
+const DEEP_MIN = 800, DEEP_MAX = 2500;   // ly — the long-haul halo beyond the cluster
+const LONG_HAUL = 500;                   // ly — legs beyond this use the long-haul contract tier
 const HUD_FADE_LO = 0.35;     // below this β the desktop help/effects panels are fully shown...
 const HUD_FADE_HI = 0.85;     // ...above this they've faded away (only after the first delivery)
 
@@ -549,17 +555,32 @@ function placeStations(seed) {
     }
   }
 
+  // Deep-space halo: a few far stations (DEEP_MIN–DEEP_MAX ly out) for licensed
+  // long-haul work. Same seeded rng, so a seed replays them; hidden from the
+  // chart, contracts, and flight labels until the career earns the license.
+  const deepN = 3 + ((rng() * 2) | 0);
+  let dguard = 0;
+  while (built.filter((s) => s.deep).length < deepN && dguard++ < 200) {
+    const p = new THREE.Vector3(rng() * 2 - 1, (rng() * 2 - 1) * 0.4, rng() * 2 - 1)
+      .normalize().multiplyScalar(DEEP_MIN + rng() * (DEEP_MAX - DEEP_MIN));
+    if (built.every((s) => !s.deep || s.pos.distanceTo(p) > 400)) {
+      built.push({ name: stationName(), pos: p, deep: true });
+    }
+  }
+
   // Each dock stocks a fixed pair of outfits, so different places sell different
-  // upgrades — the map is worth learning. Guarantee every upgrade is sold somewhere.
+  // upgrades — the map is worth learning. Guarantee every upgrade is sold in the
+  // CORE cluster (deep stations are gated, so nothing essential may hide there).
   built.forEach((s) => {
     const a = _pick(UP_KEYS);
     let b = _pick(UP_KEYS);
     while (b === a) b = _pick(UP_KEYS);
     s.shop = [a, b];
   });
+  const core = built.filter((s) => !s.deep);
   UP_KEYS.forEach((k) => {
-    if (!built.some((s) => s.shop.includes(k))) {
-      _pick(built).shop[(rng() * 2) | 0] = k;
+    if (!core.some((s) => s.shop.includes(k))) {
+      core[(rng() * core.length) | 0].shop[(rng() * 2) | 0] = k;
     }
   });
 
@@ -574,9 +595,12 @@ function placeStations(seed) {
       labelsRoot.appendChild(div);
       st = stations[i] = { el: div, dEl: div.querySelector(".d") };
     }
-    st.name = b.name; st.pos = b.pos; st.shop = b.shop;
+    st.name = b.name; st.pos = b.pos; st.shop = b.shop; st.deep = !!b.deep;
     st.el.querySelector(".nm").textContent = b.name;
   });
+  // drop leftovers when a re-seed produced fewer stations (deep count varies 3–4)
+  for (let i = built.length; i < stations.length; i++) stations[i].el.remove();
+  stations.length = built.length;
 }
 placeStations(randomSeed());   // an initial cluster so menus/test-flight work pre-career
 
@@ -610,38 +634,80 @@ function fillNames(t) {
 function cargoName() { return _pick(CARGO) + (rng() < 0.7 ? " from " + placeName() : ""); }
 function paxName() { return fillNames(_pick(PAX)); }
 
+// Long-haul-only flavor: shipments and sleepers that suit a thousand-ly crossing.
+const CARGO_DEEP = ["a generation-ship seed core", "a dormant AI archive",
+  "the relics of a lost expedition", "a prefabbed embassy, crated", "a sealed sleeper vault"];
+const PAX_DEEP = ["a cryo-sealed magnate", "the exiled heir of {P}", "a deep-survey crew in stasis",
+  "an exiled queen and her court", "a terraforming vanguard in cryo"];
+
+// One offer for the leg fromIdx → t. Legs beyond LONG_HAUL ly use the long-haul
+// tier: flatter pay per ly (they'd trivialize the economy otherwise), and
+// passenger aging caps that stay HUMAN (2–6 yr) no matter the distance — cryo
+// transit whose caps demand averaging γ in the hundreds. Only redline hardware
+// can fly those; below it your own aging (d/βγ) kills the run anyway.
+function makeOffer(fromIdx, t) {
+  const d = stations[fromIdx].pos.distanceTo(stations[t].pos);
+  const long = d > LONG_HAUL;
+  // inertial rating: max maneuvering G the load tolerates. Lower = more
+  // fragile = must burn/brake gently = a demand premium on the pay.
+  if (rng() < 0.55) {
+    // cargo: universe-time deadline — requires a minimum average speed
+    const betaReq = long ? 0.9 + rng() * 0.09 : 0.55 + rng() * 0.4;
+    const gLimit = Math.round(4 + rng() * 14);        // 4–18 g
+    return {
+      type: "cargo", long, to: t, d, gLimit,
+      what: long && rng() < 0.4 ? fillNames(_pick(CARGO_DEEP)) : cargoName(),
+      deadline: d / betaReq + (long ? 25 : 4),
+      pay: long
+        ? Math.round((250 + d * (0.45 + (betaReq - 0.9) * 2)) * (1 + Math.max(0, 11 - gLimit) * 0.05))
+        : Math.round((90 + d * (0.9 + (betaReq - 0.5) * 3.2)) * (1 + Math.max(0, 11 - gLimit) * 0.05)),
+    };
+  }
+  if (long) {
+    // long-haul passage: cryo pods. The cap is a human handful of years over a
+    // thousand-ly leg — that's an average γ in the hundreds, redline territory.
+    const maxAging = 2 + rng() * 4;                    // 2–6 yr, distance be damned
+    const gLimit = Math.round(3 + rng() * 4);          // 3–7 g (fragile pods)
+    return {
+      type: "passenger", long, to: t, d, gLimit,
+      what: rng() < 0.45 ? fillNames(_pick(PAX_DEEP)) : paxName(),
+      deadline: d / 0.7 + 50,
+      maxAging,
+      pay: Math.round((400 + d * 0.55) * (1 + Math.max(0, 8 - gLimit) * 0.06)),
+    };
+  }
+  // passenger: ship-time aging cap — requires a minimum average gamma. Kept
+  // humane: γ demands top out near 0.997c (not an impossible 0.9993c), and
+  // the cap carries a fixed +slack for the accel/brake ramp — which ages them
+  // at low γ, worse the gentler (lower-g) the ramp has to be.
+  const gReq = 4 + rng() * 12;                         // need average γ ≈ 3–13
+  const gLimit = Math.round(4 + rng() * 4);            // 4–8 g (humans)
+  return {
+    type: "passenger", long, to: t, d, gLimit,
+    what: paxName(),
+    deadline: d / 0.7 + 10,
+    maxAging: d / gReq * 1.25 + 1.5,
+    pay: Math.round((160 + d * (0.7 + gReq * 0.2)) * (1 + Math.max(0, 8 - gLimit) * 0.06)),
+  };
+}
+
 function makeContracts(fromIdx) {
   const offers = [];
   const used = new Set([fromIdx]);
-  while (offers.length < 3 && used.size < stations.length) {
+  // three offers within the core cluster
+  let guard = 0;
+  while (offers.length < 3 && guard++ < 200) {
     const t = (rng() * stations.length) | 0;
-    if (used.has(t)) continue;
+    if (used.has(t) || stations[t].deep) continue;
     used.add(t);
-    const d = stations[fromIdx].pos.distanceTo(stations[t].pos);
-    // inertial rating: max maneuvering G the load tolerates. Lower = more
-    // fragile = must burn/brake gently = a demand premium on the pay.
-    if (rng() < 0.55) {
-      // cargo: universe-time deadline — requires a minimum average speed
-      const betaReq = 0.55 + rng() * 0.4;
-      const gLimit = Math.round(4 + rng() * 14);        // 4–18 g
-      offers.push({
-        type: "cargo", what: cargoName(), to: t, d, gLimit,
-        deadline: d / betaReq + 4,
-        pay: Math.round((90 + d * (0.9 + (betaReq - 0.5) * 3.2)) * (1 + Math.max(0, 11 - gLimit) * 0.05)),
-      });
-    } else {
-      // passenger: ship-time aging cap — requires a minimum average gamma. Kept
-      // humane: γ demands top out near 0.997c (not an impossible 0.9993c), and
-      // the cap carries a fixed +slack for the accel/brake ramp — which ages them
-      // at low γ, worse the gentler (lower-g) the ramp has to be.
-      const gReq = 4 + rng() * 12;                       // need average γ ≈ 3–13
-      const gLimit = Math.round(4 + rng() * 4);          // 4–8 g (humans)
-      offers.push({
-        type: "passenger", what: paxName(), to: t, d, gLimit,
-        deadline: d / 0.7 + 10,
-        maxAging: d / gReq * 1.25 + 1.5,
-        pay: Math.round((160 + d * (0.7 + gReq * 0.2)) * (1 + Math.max(0, 8 - gLimit) * 0.06)),
-      });
+    offers.push(makeOffer(fromIdx, t));
+  }
+  // licensed: two long-haul offers out to the deep halo
+  if (game.deepLicense) {
+    const deepIdx = stations.map((s, i) => (s.deep && i !== fromIdx ? i : -1)).filter((i) => i >= 0);
+    while (offers.length < 5 && deepIdx.length) {
+      const t = deepIdx.splice((rng() * deepIdx.length) | 0, 1)[0];
+      offers.push(makeOffer(fromIdx, t));
     }
   }
   return offers;
@@ -842,7 +908,12 @@ function contractReq(c) {
   const dv = 2 * Math.atanh(betaMin);               // accel + brake at that speed
   const reachable = betaMin <= capBeta();
   const affordable = dv <= game.fuel;
-  return { betaMin, gammaMin: lorentz(betaMin), dv, reachable, affordable, feasible: reachable && affordable };
+  // Meeting the clause isn't enough on a long haul — YOU age d/βγ too. Check the
+  // aging at the fastest speed you can afford against your remaining career.
+  const pb = planBeta();
+  const survivable = pb > 1e-9 && game.pilotAge + d / (pb * lorentz(pb)) < retireAge();
+  return { betaMin, gammaMin: lorentz(betaMin), dv, reachable, affordable, survivable,
+           feasible: reachable && affordable && survivable };
 }
 // Fastest round-trip speed your current Δv (and governor) allows — for planning
 // a leg to a station with no contract. 2·atanh(β) = fuel ⇒ β = tanh(fuel/2).
@@ -866,8 +937,11 @@ function buildStarMap() {
   const H = 100, W = Math.round(H * aspect), pad = 12;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 
+  // Fit the CORE cluster only — deep-space stations are hundreds of ly out and
+  // would crush the cluster to a dot; they render as edge markers instead.
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const s of stations) {
+    if (s.deep) continue;
     minX = Math.min(minX, s.pos.x); maxX = Math.max(maxX, s.pos.x);
     minZ = Math.min(minZ, s.pos.z); maxZ = Math.max(maxZ, s.pos.z);
   }
@@ -878,6 +952,7 @@ function buildStarMap() {
   const scale = Math.min((W - 2 * pad) / Math.max(maxX - minX, 1),
                          (H - 2 * pad) / Math.max(maxZ - minZ, 1));
   stations.forEach((s) => {
+    if (s.deep) return;
     s._mx = W / 2 + (s.pos.x - cx) * scale;
     s._my = H / 2 + (s.pos.z - cz) * scale;
   });
@@ -885,10 +960,12 @@ function buildStarMap() {
   // Label layout: estimate each label's footprint and dodge neighbours — prefer
   // the right side, flip left or nudge vertically when names would collide.
   // `placed` starts with every node dot so labels never sit on other stations.
-  const placed = stations.map((st) => ({ x1: st._mx - 2.6, y1: st._my - 2.6, x2: st._mx + 2.6, y2: st._my + 2.6 }));
+  const placed = stations.filter((st) => !st.deep)
+    .map((st) => ({ x1: st._mx - 2.6, y1: st._my - 2.6, x2: st._mx + 2.6, y2: st._my + 2.6 }));
   const collides = (b, skip) => placed.some((o, idx) =>
     idx !== skip && b.x1 < o.x2 && b.x2 > o.x1 && b.y1 < o.y2 && b.y2 > o.y1);
   stations.forEach((st, i) => {
+    if (st.deep) return;
     const c = game.offers.find((o) => o.to === i);
     st._nm = st.name.replace(_SUFFIX_RE, "");
     let w = 3 + st._nm.length * 1.9;                     // ~monospace advance at font-size 3
@@ -910,13 +987,41 @@ function buildStarMap() {
     placed.push(box(pick[0], pick[1]));
   });
 
+  // Deep-space stations (licensed only): pinned to the chart border along their
+  // true bearing from the cluster centre — signposts pointing off the map.
+  const deeps = [];
+  if (game.deepLicense) {
+    const m = 10;
+    stations.forEach((s, i) => { if (s.deep) deeps.push([s, i]); });
+    for (const [s] of deeps) {
+      const dx = s.pos.x - cx, dz = s.pos.z - cz;
+      const len = Math.hypot(dx, dz) || 1;
+      const ux = dx / len, uz = dz / len;
+      const tX = ux > 1e-6 ? (W - m - W / 2) / ux : ux < -1e-6 ? (m - W / 2) / ux : Infinity;
+      const tY = uz > 1e-6 ? (H - m - H / 2) / uz : uz < -1e-6 ? (m - H / 2) / uz : Infinity;
+      const t = Math.min(tX, tY);
+      s._mx = W / 2 + ux * t; s._my = H / 2 + uz * t;
+      s._vert = tX < tY;                     // pinned to a left/right border
+    }
+    // separate markers that landed on the same stretch of border
+    for (let a = 0; a < deeps.length; a++) for (let b = a + 1; b < deeps.length; b++) {
+      const A = deeps[a][0], B = deeps[b][0];
+      if (Math.abs(A._mx - B._mx) < 16 && Math.abs(A._my - B._my) < 13) {
+        if (B._vert) B._my = THREE.MathUtils.clamp(B._my + 15, m, H - m);
+        else B._mx = THREE.MathUtils.clamp(B._mx + 22, m, W - m);
+      }
+    }
+  }
+
   let out = "";
   const dock = stations[game.station];
   for (const c of game.offers) {
     const b = stations[c.to];
-    out += `<line x1="${dock._mx}" y1="${dock._my}" x2="${b._mx}" y2="${b._my}" class="map-edge" data-edge="${c.to}"/>`;
+    if (b._mx === undefined) continue;       // unlicensed deep target (shouldn't happen)
+    out += `<line x1="${dock._mx}" y1="${dock._my}" x2="${b._mx}" y2="${b._my}" class="map-edge${b.deep || dock.deep ? " deep" : ""}" data-edge="${c.to}"/>`;
   }
   stations.forEach((st, i) => {
+    if (st.deep) return;                     // rendered as edge markers below
     const isDock = i === game.station;
     const c = game.offers.find((o) => o.to === i);
     const cls = isDock ? "dock" : c ? "dest" : "node";
@@ -934,6 +1039,37 @@ function buildStarMap() {
     }
     out += `</g>`;
   });
+  // deep edge markers: hollow ring + name, distance, and contract line
+  for (const [s, i] of deeps) {
+    const c = game.offers.find((o) => o.to === i);
+    const cls = i === game.station ? "dock" : c ? "dest" : "node";
+    const rows = [[s.name.replace(_SUFFIX_RE, ""), `map-label ${cls}`],
+                  [s.pos.distanceTo(dock.pos).toFixed(0) + " ly", "map-sub dim"]];
+    if (c) {
+      const ok = contractReq(c).feasible;
+      rows.push([`${ok ? "✓" : "✗"} ₡${contractPay(c)} · ${c.gLimit}g`, `map-sub ${ok ? "ok" : "no"}`]);
+    }
+    let anchor = "", tx;
+    if (s._vert) {
+      const right = s._mx > W / 2;
+      anchor = right ? ' text-anchor="end"' : "";
+      tx = right ? s._mx - 3.6 : s._mx + 3.6;
+    } else {
+      anchor = ' text-anchor="middle"';
+      tx = THREE.MathUtils.clamp(s._mx, 20, W - 20);
+    }
+    let y0;                                   // first text row baseline
+    if (s._vert) y0 = THREE.MathUtils.clamp(s._my - 1, 4.5, H - 3 - rows.length * 3.6);
+    else if (s._my < H / 2) y0 = s._my + 5;                     // top border: stack downward
+    else y0 = s._my - 3 - (rows.length - 1) * 3.6;              // bottom border: stack upward
+    out += `<g class="map-hit" data-i="${i}">` +
+      `<circle cx="${s._mx}" cy="${s._my}" r="7" class="hit"/>` +
+      `<circle cx="${s._mx}" cy="${s._my}" r="2" class="map-node deepring ${cls}"/>`;
+    rows.forEach((r, k) => {
+      out += `<text x="${tx}" y="${(y0 + k * 3.6).toFixed(1)}"${anchor} class="${r[1]}">${r[0]}</text>`;
+    });
+    out += `</g>`;
+  }
   svg.innerHTML = out;
 }
 
@@ -964,13 +1100,14 @@ function selectMapNode(i) {
     const req = contractReq(c);
     feasible = req.feasible;
     const frag = c.gLimit <= 6 ? `<span class="frag">fragile: ${c.gLimit}g rating</span>` : `rugged: ${c.gLimit}g rating`;
-    html += `<div class="job">${c.type === "cargo" ? "FREIGHT" : "PASSAGE"} — ${c.what}<span class="pay">₡${contractPay(c)}</span></div>`;
+    html += `<div class="job">${c.long ? "LONG-HAUL " : ""}${c.type === "cargo" ? "FREIGHT" : "PASSAGE"} — ${c.what}<span class="pay">₡${contractPay(c)}</span></div>`;
     html += c.type === "cargo"
       ? `<div class="req">deadline <b>${fmtY(c.deadline)}</b> universe-time · needs ≥ <b>${fmtBeta(req.betaMin)}c</b> average</div>`
       : `<div class="req">must arrive aged ≤ <b>${c.maxAging.toFixed(1)} yr</b> · keep average γ ≥ <b>${req.gammaMin.toFixed(1)}</b></div>`;
     html += `<div class="req">${frag} · to <b>${stations[i].name}</b></div>`;
     verdict = !req.reachable ? `<span class="bad">✗ too fast for your governor — needs Redline Coils</span>`
             : !req.affordable ? `<span class="bad">✗ not enough Δv — need ${req.dv.toFixed(1)}, refuel first</span>`
+            : !req.survivable ? `<span class="bad">✗ you'd age out en route — need more speed (Δv or Redline Coils)</span>`
             : `<span class="good">✓ you can make this run</span>`;
     if (c.type === "passenger") { beta = req.betaMin; gamma = req.gammaMin; }
     else { beta = planBeta(); gamma = lorentz(beta); }
@@ -1186,6 +1323,13 @@ function dock() {
   game.credits += pay;
   game.earned += pay;
   if (ok) game.deliveries++; else game.failures++;
+  // Deep Space License: a clean delivery after touching deep-γ proves you can
+  // survive redline — long-haul brokers open their books.
+  if (!game.deepLicense && ok && game.maxGamma >= DEEP_GAMMA) {
+    game.deepLicense = true;
+    notes.push(`◈ DEEP SPACE LICENSE earned — you delivered after touching γ ${fmtGamma(game.maxGamma)}. Long-haul stations are now on your chart.`);
+    showEggToast("◈ DEEP SPACE LICENSE — long-haul brokers know your name");
+  }
   game.station = c.to;
   game.lastResult = { kind: "dock", ok, pay, usedCoord, usedShip, notes, c };
   game.contract = null;
@@ -1665,6 +1809,7 @@ function aimAtPos(pos, dt, rate) {
 function stationAtScreen(px, py, radius) {
   let best = -1, bestD = radius;
   for (let i = 0; i < stations.length; i++) {
+    if (stations[i].deep && !game.deepLicense) continue;   // invisible until licensed
     _proj.copy(stations[i].pos).project(camera);
     if (_proj.z > 1) continue;             // behind the camera
     const sx = (_proj.x * 0.5 + 0.5) * window.innerWidth;
@@ -1787,7 +1932,9 @@ function update(dt) {
     _dir.copy(apTgt.pos).sub(ship.pos).normalize();
     const decel = apDecelRate(game.contract.gLimit);
     if (_fwd.dot(_dir) > 0.2) {
-      if (!apBraking && ship.beta > DOCK_BETA && apDist < 200 &&
+      // pre-filter before running the brake sim each frame; a full-redline brake
+      // can eat well past 200 ly, so licensed pilots get a wider window
+      if (!apBraking && ship.beta > DOCK_BETA && apDist < (game.deepLicense ? 600 : 200) &&
           apDist - DOCK_RADIUS <= apBrakeDistance(ship.beta, decel)) {
         apBraking = true;
       }
@@ -2036,6 +2183,8 @@ function updateLabels() {
   const labelFade = 1 - THREE.MathUtils.smoothstep(ship.beta, 0.9, 0.97);
   for (let i = 0; i < stations.length; i++) {
     const st = stations[i];
+    // deep-space stations stay off the nav display until the license is earned
+    if (st.deep && !game.deepLicense) { st.el.style.display = "none"; continue; }
     const isTarget = game.contract && game.contract.to === i;
     // the target label stays visible at any speed; others fade near c
     const fade = isTarget ? 1 : labelFade;

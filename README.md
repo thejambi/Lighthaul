@@ -70,6 +70,16 @@ flies high-γ passenger work cheap, but a tiny tank and thin hull). Each is a
 different trade in Δv capacity, fuel economy, handling, and how much punishment
 the load takes; upgrades stack on top, so you patch a weakness over a career.
 
+**Deep Space License.** Complete a delivery having touched **γ ≥ 25,000**
+(Redline Coils territory — the stock governor tops out at γ 1,000) and long-haul
+brokers open their books: a handful of **deep-space stations 800–2,500 ly out**
+appear at the edges of your chart, with contracts to match. Long-haul passage is
+cryo transit — the pods may only age a human handful of years across a
+thousand-ly leg, which means averaging **γ in the hundreds**. And your own aging
+polices the freight runs: below redline, `d/βγ` across 1,500 ly is a career's
+worth of years. Deep space is where the full build — tank, drive, coils,
+docking assist — finally flies as one machine.
+
 **Records & rank.** Retire and you earn a rank on your final balance — from
 *Deadhead* to *Lightspeed Legend* — and your best careers (richest retirement,
 most deliveries, highest Lorentz γ ever reached) persist as records to beat on

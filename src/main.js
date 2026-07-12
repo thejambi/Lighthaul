@@ -1145,7 +1145,8 @@ function depart(c) {
   updateBadges();
   disarmTow();
   setPhase("flight");
-  showToast("undocked — " + stations[c.to].name);
+  // no "undocked" toast — the countdown's "AIM AT <dest>" already confirms it
+  // (and the two overlapped on mobile)
 }
 
 function dock() {

@@ -590,12 +590,25 @@ const CARGO = ["medical isotopes", "a cryo seed vault", "quantum cores", "antima
   "a monastery's relics", "self-replicating looms", "cryo-preserved coral", "living timber",
   "a shard of a dead moon", "unlabeled medical vats", "a black-box flight recorder",
   "gene-locked seed grain", "a whale in a tank", "contraband star charts"];
-const PAX = ["Dr. Imura", "Envoy Ashari", "the Kessler family", "a colonist cohort",
-  "Magistrate Voss", "two exogeologists", "a stasis choir", "Capt. Rhee (ret.)",
-  "a diplomatic quartet", "the last archivist of Meridian", "Ambassador Okonkwo",
-  "the Solari twins", "a pilgrim caravan", "a fugitive heiress", "a touring orchestra",
-  "three cryo-nauts", "a xenolinguist", "Dr. Vale and her live samples", "a newlywed couple",
-  "a witness in protective transit", "an off-world monk", "a delegation of terraformers"];
+// Passenger templates: {N} fills with a generated person/house name, {P} with a
+// generated place — same seeded generators as the station names, so every career
+// meets fresh people from worlds that may not even be on the chart.
+const PAX = ["Dr. {N}", "Envoy {N}", "the {N} family", "a colonist cohort from {P}",
+  "Magistrate {N}", "two exogeologists", "a stasis choir from {P}", "Capt. {N} (ret.)",
+  "a diplomatic quartet", "the last archivist of {P}", "Ambassador {N}",
+  "the {N} twins", "a pilgrim caravan from {P}", "a fugitive heiress", "a touring orchestra",
+  "three cryo-nauts", "a xenolinguist", "Dr. {N} and her live samples", "a newlywed couple",
+  "a witness in protective transit", "an off-world monk", "a delegation of terraformers from {P}"];
+
+// A place a shipment hails from — sometimes a bare world, sometimes a full
+// facility name. It doesn't need to exist on the chart; the galaxy is bigger
+// than your cluster.
+function placeName() { return rng() < 0.4 ? stationName() : coreName(); }
+function fillNames(t) {
+  return t.replace("{N}", coreName()).replace("{P}", placeName());
+}
+function cargoName() { return _pick(CARGO) + (rng() < 0.7 ? " from " + placeName() : ""); }
+function paxName() { return fillNames(_pick(PAX)); }
 
 function makeContracts(fromIdx) {
   const offers = [];
@@ -612,7 +625,7 @@ function makeContracts(fromIdx) {
       const betaReq = 0.55 + rng() * 0.4;
       const gLimit = Math.round(4 + rng() * 14);        // 4–18 g
       offers.push({
-        type: "cargo", what: _pick(CARGO), to: t, d, gLimit,
+        type: "cargo", what: cargoName(), to: t, d, gLimit,
         deadline: d / betaReq + 4,
         pay: Math.round((90 + d * (0.9 + (betaReq - 0.5) * 3.2)) * (1 + Math.max(0, 11 - gLimit) * 0.05)),
       });
@@ -624,7 +637,7 @@ function makeContracts(fromIdx) {
       const gReq = 4 + rng() * 12;                       // need average γ ≈ 3–13
       const gLimit = Math.round(4 + rng() * 4);          // 4–8 g (humans)
       offers.push({
-        type: "passenger", what: _pick(PAX), to: t, d, gLimit,
+        type: "passenger", what: paxName(), to: t, d, gLimit,
         deadline: d / 0.7 + 10,
         maxAging: d / gReq * 1.25 + 1.5,
         pay: Math.round((160 + d * (0.7 + gReq * 0.2)) * (1 + Math.max(0, 8 - gLimit) * 0.06)),

@@ -1796,13 +1796,14 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Space") e.preventDefault();
   if (e.code === "KeyH" && game.testFlight) toggleUI();   // hide-all is a test-flight-only view
   if (e.code === "KeyR") callTow();
-  if (e.code === "KeyM") { audio.toggleMute(); updateSoundIndicator(); }
+  if (e.code === "KeyM") { audio.toggleMute(); updateSoundIndicator(); saveSettings(); }
   if (e.code === "KeyV" && game.testFlight) cycleSpeedPreset();   // speed presets: test-flight only
   if (e.code === "Digit1") fx.aberration ^= 1;
   if (e.code === "Digit2") fx.doppler ^= 1;
   if (e.code === "Digit3") fx.beaming ^= 1;
   if (e.code === "Digit4") fx.contraction ^= 1;
   if (e.code === "Digit5") fx.cmb ^= 1;
+  if (/^Digit[1-5]$/.test(e.code)) saveSettings();
 });
 window.addEventListener("keyup", (e) => keys.delete(e.code));
 
@@ -1961,17 +1962,32 @@ window.addEventListener("pointerup", () => { if (throttleHeld) clearZone(); });
 
 // effect-row taps
 const fx = { aberration: 1, doppler: 1, beaming: 1, contraction: 1, cmb: 1 };
+
+// --- settings persistence: effect toggles + mute survive reloads ---
+const SETTINGS_KEY = "lighthaul.settings.v1";
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ muted: audio.isMuted(), fx })); } catch (_) {}
+}
+(() => {
+  try {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    if (!s) return;
+    if (s.fx) for (const k of Object.keys(fx)) if (k in s.fx) fx[k] = s.fx[k] ? 1 : 0;
+    if (s.muted) audio.setMuted(true);      // pre-init: audio honours this when it starts
+  } catch (_) {}
+})();
+
 const fxRows = { aberration: "fx-aberr", doppler: "fx-doppler", beaming: "fx-beam", contraction: "fx-contract", cmb: "fx-cmb" };
 for (const [k, id] of Object.entries(fxRows)) {
   el(id).style.pointerEvents = "auto";
   el(id).style.cursor = "pointer";
-  el(id).addEventListener("click", () => { fx[k] ^= 1; });
+  el(id).addEventListener("click", () => { fx[k] ^= 1; saveSettings(); });
 }
 document.querySelector("#effects .snd").style.pointerEvents = "auto";
-document.querySelector("#effects .snd").addEventListener("click", () => { audio.toggleMute(); updateSoundIndicator(); });
+document.querySelector("#effects .snd").addEventListener("click", () => { audio.toggleMute(); updateSoundIndicator(); saveSettings(); });
 
 // touch action buttons (mobile): mute + a confirm-then-fire tow
-el("btn-mute").addEventListener("click", () => { audio.toggleMute(); updateSoundIndicator(); });
+el("btn-mute").addEventListener("click", () => { audio.toggleMute(); updateSoundIndicator(); saveSettings(); });
 let towArmed = false, towTimer = null;
 function disarmTow() {
   towArmed = false; clearTimeout(towTimer);

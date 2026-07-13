@@ -7,6 +7,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="alternate icon" href="favicon-32.png" type="image/png" sizes="32x32" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#02040a" />
 <meta name="description" content="A relativistic courier game — haul cargo and passengers at a hair under light speed, and let special relativity be the economy." />
 <style>
@@ -552,6 +553,7 @@
       </div>
       <div id="title-records" class="title-records" style="display:none"></div>
       <div class="go" id="title-go">▶ click or press any key to report for duty</div>
+      <button id="btn-install" class="seed-chip" style="display:none; margin-top:14px">📲 INSTALL APP</button>
     </div>
   </div>
 
@@ -745,5 +747,29 @@
   }
   </script>
   <script type="module" src="./src/main.js"></script>
+  <script>
+    // PWA: offline cache + the install chip on the title screen
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+    let deferredInstall = null;
+    const installBtn = document.getElementById("btn-install");
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredInstall = e;
+      installBtn.style.display = "inline-block";
+    });
+    installBtn.addEventListener("click", (e) => {
+      e.stopPropagation();                    // don't let the title screen swallow the tap as "start"
+      if (!deferredInstall) return;
+      deferredInstall.prompt();
+      deferredInstall.userChoice.finally(() => { deferredInstall = null; installBtn.style.display = "none"; });
+    });
+    // iOS has no install prompt — show a one-line hint instead (Safari, not yet standalone)
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (isIOS && !navigator.standalone) {
+      installBtn.style.display = "inline-block";
+      installBtn.textContent = "📲 install: Share ▸ Add to Home Screen";
+      installBtn.addEventListener("click", (e) => e.stopPropagation());
+    }
+  </script>
 </body>
 </html>

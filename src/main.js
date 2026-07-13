@@ -50,6 +50,7 @@ const FUEL_MAX_DISC = 0.35;  // ...capped here. Big fills (a large tank run low)
 const LOW_FUEL = 6;          // Δv below which the dock nags you to refuel (see buildStation)
 const REP_PER_DELIVERY = 0.03; // contract pay ramps +3% per successful delivery (reputation)...
 const REP_MAX = 0.75;         // ...capped at +75%, a built-in raise atop the Broker License
+const VIGNETTE_CHANCE = 0.25; // story vignettes land every ~handful of deliveries, not every one
 const DOCK_RADIUS = 15;      // ly
 const DOCK_BETA = 0.2;
 const THRUST_RATE = 0.14;   // base throttle change per second (W/S, ↑/↓)
@@ -1609,8 +1610,10 @@ function dock() {
     notes.push(`◈ DEEP SPACE LICENSE earned — you delivered after touching γ ${fmtGamma(game.maxGamma)}. Long-haul stations are now on your chart.`);
     showEggToast("◈ DEEP SPACE LICENSE — long-haul brokers know your name");
   }
-  // the story the clocks wrote: how long this dock has waited since your last call
-  const vignette = makeVignette(stations[c.to], ship.coordTime);
+  // the story the clocks wrote: how long this dock has waited since your last
+  // call — told only every ~handful of deliveries, so the beats stay special
+  // (lastVisit is stamped either way, so untold gaps keep accruing honestly)
+  const vignette = Math.random() < VIGNETTE_CHANCE ? makeVignette(stations[c.to], ship.coordTime) : "";
   stations[c.to].lastVisit = ship.coordTime;
   game.station = c.to;
   game.journal.push({ ok, what: c.what, to: stations[c.to].name, pay, coordY: usedCoord });

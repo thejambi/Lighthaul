@@ -158,6 +158,7 @@ const game = {
   preflight: 0,               // seconds left in the frozen pre-launch/aim window
   testFlight: false,          // free-flight sandbox — no contract, clock, fuel, or damage
   tutorialActive: false,      // flight school: real physics, zero career consequence
+  dailyRun: false,            // flying today's shared DAILY RUN cluster
   debug: false,               // play-test mode: free upgrades + teleport (armed at ship-select)
   maxGamma: 1,                // highest Lorentz factor reached this career (a persisted record)
   deepLicense: false,         // earned by delivering after touching γ ≥ DEEP_GAMMA — opens long-haul space
@@ -169,20 +170,21 @@ const game = {
 // so every run is measured against your best. Rank is earned on final balance —
 // the game's whole pitch is "retire rich", and the nest egg is what you keep.
 const RECORDS_KEY = "lighthaul.records.v1";
-const RANKS = [        // final-balance thresholds → title (tune after playtesting)
+const RANKS = [        // final-balance thresholds → title + share emoji
   // the redline tiers: only a Deep Space License era of long hauls climbs here
-  [128000, "The Ageless"],
-  [64000,  "Deep Space Magnate"],
-  [32000,  "Redline Royalty"],
+  [128000, "The Ageless", "♾️"],
+  [64000,  "Deep Space Magnate", "🌌"],
+  [32000,  "Redline Royalty", "👑"],
   // reachable on core-cluster work alone
-  [16000, "Lightspeed Legend"],
-  [10000, "Void Baron"],
-  [6000,  "Master Courier"],
-  [3000,  "Journeyman Courier"],
-  [1000,  "Drifter"],
-  [0,     "Deadhead"],
+  [16000, "Lightspeed Legend", "⚡"],
+  [10000, "Void Baron", "💰"],
+  [6000,  "Master Courier", "🚀"],
+  [3000,  "Journeyman Courier", "📦"],
+  [1000,  "Drifter", "🛰️"],
+  [0,     "Deadhead", "💀"],
 ];
 function rankFor(bal) { return (RANKS.find(([m]) => bal >= m) || RANKS[RANKS.length - 1])[1]; }
+function rankEmoji(bal) { return (RANKS.find(([m]) => bal >= m) || RANKS[RANKS.length - 1])[2]; }
 // the rank above the one earned (null at the top) — shown as a target at retirement
 function nextRank(bal) {
   const i = RANKS.findIndex(([m]) => bal >= m);
@@ -478,6 +480,12 @@ function mulberry32(a) {                            // fast seedable PRNG → [0
   };
 }
 function randomSeed() { return Math.random().toString(36).slice(2, 8); }  // short shareable string
+// today's shared cluster — everyone who taps DAILY RUN flies the same map
+function dailySeed() {
+  const d = new Date();
+  return "lh" + String(d.getFullYear() % 100).padStart(2, "0") +
+    String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+}
 let worldSeed = "";
 let rng = Math.random;                             // reassigned by placeStations()
 
@@ -928,20 +936,24 @@ el("st-retire").addEventListener("click", () => {
 });
 
 // copy the current map seed to the clipboard so a good cluster can be replayed
-el("st-seed").addEventListener("click", () => {
-  const btn = el("st-seed");
-  const done = () => { btn.textContent = "seed " + worldSeed + " · copied ✓"; btn.classList.add("copied"); };
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(worldSeed).then(done, fallbackCopy);
-    else fallbackCopy();
-  } catch (_) { fallbackCopy(); }
-  function fallbackCopy() {                      // execCommand path for non-secure contexts
+// clipboard with an execCommand fallback for non-secure contexts
+function copyText(str, done) {
+  const fb = () => {
     const ta = document.createElement("textarea");
-    ta.value = worldSeed; ta.style.position = "fixed"; ta.style.opacity = "0";
+    ta.value = str; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
     try { document.execCommand("copy"); } catch (_) {}
     document.body.removeChild(ta); done();
-  }
+  };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(str).then(done, fb);
+    else fb();
+  } catch (_) { fb(); }
+}
+
+el("st-seed").addEventListener("click", () => {
+  const btn = el("st-seed");
+  copyText(worldSeed, () => { btn.textContent = "seed " + worldSeed + " · copied ✓"; btn.classList.add("copied"); });
 });
 
 // ---------------------------------------------------------------------------
@@ -1642,6 +1654,29 @@ function buildGameOver() {
 }
 el("go-new").addEventListener("click", () => location.reload());
 
+// DAILY RUN: everyone who taps this today flies the same cluster
+el("btn-daily").addEventListener("click", () => {
+  el("seed-input").value = dailySeed();
+  showEggToast("📅 daily cluster loaded — pick a ship");
+});
+
+// Wordle-style run summary → clipboard, for bragging in the group chat
+function buildShareText() {
+  const head = game.dailyRun
+    ? `Lighthaul Daily — ${new Date().toISOString().slice(0, 10)}`
+    : `Lighthaul Run`;
+  return head + "\n" +
+    `${rankEmoji(game.credits)} ${rankFor(game.credits)}\n` +
+    `📦 ${game.deliveries} deliveries · ₡${game.credits.toLocaleString()}\n` +
+    `⏳ ${fmtY(ship.coordTime)} passed · 🧑‍🚀 aged ${(game.pilotAge - START_AGE).toFixed(1)} yr\n` +
+    `⚡ peak γ ${fmtGamma(game.maxGamma)}\n` +
+    `🌱 seed ${worldSeed}`;
+}
+el("go-share").addEventListener("click", () => {
+  const b = el("go-share");
+  copyText(buildShareText(), () => { b.textContent = "COPIED ✓"; setTimeout(() => (b.textContent = "📋 SHARE RUN"), 1800); });
+});
+
 // title-screen records line (hidden until you've retired at least once)
 function updateTitleRecords() {
   const t = el("title-records");
@@ -1745,6 +1780,7 @@ function applyClass(key) {
   debugArmed = false;
   const seedEl = el("seed-input");
   placeStations(seedEl ? seedEl.value.trim() : "");   // typed seed, or a fresh random one
+  game.dailyRun = worldSeed === dailySeed();          // flying today's shared cluster?
   stations[game.station].lastVisit = 0;               // home dock: the career starts here
   setPhase("station");
 }

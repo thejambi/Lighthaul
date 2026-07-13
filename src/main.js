@@ -157,6 +157,7 @@ const game = {
   integrity: 1,               // cargo/passenger condition on the current run (0..1)
   preflight: 0,               // seconds left in the frozen pre-launch/aim window
   testFlight: false,          // free-flight sandbox — no contract, clock, fuel, or damage
+  tutorialActive: false,      // flight school: real physics, zero career consequence
   debug: false,               // play-test mode: free upgrades + teleport (armed at ship-select)
   maxGamma: 1,                // highest Lorentz factor reached this career (a persisted record)
   deepLicense: false,         // earned by delivering after touching γ ≥ DEEP_GAMMA — opens long-haul space
@@ -1318,6 +1319,124 @@ el("tf-exit").addEventListener("click", exitTestFlight);
 el("shipcard-test").addEventListener("click", () => startTestFlight(game.cls, "station"));
 el("shipcard-art").addEventListener("click", () => startTestFlight(game.cls, "station"));
 
+// ---------------------------------------------------------------------------
+// Flight School — a two-minute scripted training run for new pilots. REAL
+// physics (fuel burns, you age, freight bruises: that's the curriculum) but
+// zero career consequence — dock/tow are intercepted and every touched dial is
+// reset on the way out. Offered on the select screen until a career ranks
+// Journeyman; re-flyable any time from the small link.
+// ---------------------------------------------------------------------------
+let tutor = null;
+const TUTOR = [
+  { hl: null,
+    text: () => `Launch window — the clock is frozen. Put the gold marker <b>dead centre</b>: drag to steer, or just <b>tap the marker</b>.`,
+    done: () => { _dir.copy(stations[game.contract.to].pos).sub(ship.pos).normalize(); return shipForward(_ab).dot(_dir) > 0.985; } },
+  { hl: "fuelBar",
+    text: () => `Locked on. <b>Throttle up</b> (W / thrust bar) and watch <b>Δv fall</b> — speed is fuel, and braking costs the same again.`,
+    done: () => ship.beta > 0.5 },
+  { hl: "contract",
+    text: () => `Two clocks rule every run: the <b>deadline</b> ticks in universe years, but <b>you</b> age on ship time. Push past <b>0.9c</b> — the faster you fly, the less you age.`,
+    done: () => ship.beta > 0.9 },
+  { hl: "integBar",
+    text: () => `Now the hard lesson. <b>Turbo-brake</b> (hold Shift+S): feel the G blow past the <b>6g rating</b> and watch <b>integrity</b> drop — hard hands bruise the freight.`,
+    done: () => game.integrity < 0.985 || ship.beta < 0.3 },
+  { hl: null,
+    text: () => `Ease the rest off — dock below <b>0.20c</b> within <b>15 ly</b>. The status line under the contract calls your braking.`,
+    done: () => false },                     // completes via the dock() intercept
+];
+
+function tutorialDone() { try { return localStorage.getItem("lighthaul.tutorial.v1") === "done"; } catch (_) { return true; } }
+function updateTutorPrompt() {
+  const p = el("tutor-prompt");
+  if (p) p.style.display = (!tutorialDone() && records.bestBalance < 3000) ? "flex" : "none";
+}
+
+function startTutorial() {
+  game.cls = "courier";
+  game.tutorialActive = true;
+  game.testFlight = false;
+  game.station = 0;
+  game.fuel = 14; game.credits = 450;
+  ship.coordTime = 0; ship.shipTime = 0; game.pilotAge = START_AGE; game.maxGamma = 1;
+  el("tutor-done").style.display = "none";
+  // nearest-to-~120 ly core neighbour: long enough to cruise, short enough to finish
+  let best = 1, score = Infinity;
+  stations.forEach((s, i) => {
+    if (!i || s.deep) return;
+    const q = Math.abs(stations[0].pos.distanceTo(s.pos) - 120);
+    if (q < score) { score = q; best = i; }
+  });
+  const d = stations[0].pos.distanceTo(stations[best].pos);
+  depart({
+    type: "cargo", long: false, to: best, d, gLimit: 6,
+    what: "a Guild training pallet", deadline: d / 0.6 + 20, pay: 180,
+  });
+  tutor = { step: 0, lastText: "", hlEl: null };
+  el("tutor").style.display = "block";
+  updateTutorial();                          // paint step 1 immediately
+}
+
+function clearTutorHl() {
+  if (tutor && tutor.hlEl) { el(tutor.hlEl).classList.remove("tutor-hl"); tutor.hlEl = null; }
+}
+function updateTutorial() {
+  const step = TUTOR[tutor.step];
+  let text;
+  if (game.fuel <= 0) {
+    text = `<b>Dead stick</b> — the tank's dry. Press <b>R</b> (or TOW): expensive, never fatal. It ends this training run.`;
+  } else {
+    text = step.text();
+    _dir.copy(stations[game.contract.to].pos).sub(ship.pos).normalize();
+    if (game.preflight <= 0 && tutor.step > 0 && shipForward(_ab).dot(_dir) < 0) {
+      text += ` <span class="dim">(overshot? tap the marker to swing back)</span>`;
+    }
+  }
+  if (text !== tutor.lastText) {
+    tutor.lastText = text;
+    const box = el("tutor");
+    box.querySelector(".tutor-step").textContent = `FLIGHT SCHOOL · ${tutor.step + 1}/${TUTOR.length}`;
+    box.querySelector(".tutor-text").innerHTML = text;
+  }
+  if (step.done()) {
+    clearTutorHl();
+    tutor.step = Math.min(tutor.step + 1, TUTOR.length - 1);
+    const hl = TUTOR[tutor.step].hl;
+    if (hl) { el(hl).classList.add("tutor-hl"); tutor.hlEl = hl; }
+  }
+}
+
+// outcome: "docked" | "towed" | "abort"
+function finishTutorial(outcome) {
+  const integ = Math.round(game.integrity * 100);
+  clearTutorHl();
+  game.tutorialActive = false; tutor = null;
+  el("tutor").style.display = "none";
+  // wipe everything the training run touched — the career starts clean
+  game.contract = null; game.preflight = 0;
+  ship.coordTime = 0; ship.shipTime = 0; ship.beta = 0; ship.throttle = 0;
+  game.pilotAge = START_AGE; game.integrity = 1; game.maxGamma = 1;
+  game.fuel = 14; game.station = 0;
+  try { localStorage.setItem("lighthaul.tutorial.v1", "done"); } catch (_) {}
+  const msg = outcome === "docked"
+    ? (integ >= 99
+        ? `Docked clean at <b>100% integrity</b> — the Guild would pay full rate. You're ready: pick your ship.`
+        : `Docked! But the pallet took <b>${100 - integ}% damage</b> from those hard burns — real pay gets cut for that. Brake gentler, get paid fuller. Pick your ship.`)
+    : outcome === "towed"
+      ? `Training over — the tow works exactly like that on a real run (it just costs credits and years). Pick your ship.`
+      : `Training cut short — re-fly it any time from the 🎓 link below.`;
+  el("tutor-done").innerHTML = `<b>◈ FLIGHT SCHOOL COMPLETE</b><br/>${msg}`;
+  el("tutor-done").style.display = "block";
+  updateTutorPrompt();
+  setPhase("select");
+}
+
+el("btn-tutorial").addEventListener("click", startTutorial);
+el("link-tutorial").addEventListener("click", startTutorial);
+el("btn-tutorial-skip").addEventListener("click", () => {
+  try { localStorage.setItem("lighthaul.tutorial.v1", "done"); } catch (_) {}
+  updateTutorPrompt();
+});
+
 function depart(c) {
   game.contract = { ...c, acceptCoord: ship.coordTime, acceptShip: ship.shipTime };
   game.integrity = 1;
@@ -1347,6 +1466,7 @@ function depart(c) {
 }
 
 function dock() {
+  if (game.tutorialActive) { finishTutorial("docked"); return; }
   const c = game.contract;
   const usedCoord = ship.coordTime - c.acceptCoord;
   const usedShip = ship.shipTime - c.acceptShip;
@@ -1386,6 +1506,7 @@ function dock() {
 
 function callTow() {
   if (game.phase !== "flight" || game.testFlight) return;   // nothing to tow in a free flight
+  if (game.tutorialActive) { finishTutorial("towed"); return; }   // the tow IS the lesson
   const c = game.contract;
   let nearest = 0, best = Infinity;
   stations.forEach((s, i) => {
@@ -1503,6 +1624,7 @@ function start() {
   try { window.focus(); } catch (_) {}
   audio.init();
   updateSoundIndicator();
+  updateTutorPrompt();          // offer flight school until a career ranks
   setPhase("select");           // choose a ship before the first contract
 }
 el("title").addEventListener("click", start);
@@ -1576,7 +1698,10 @@ buildClassSelect();
 window.addEventListener("keydown", (e) => {
   if (game.phase === "title") { start(); return; }
   if (game.phase !== "flight") return;
-  if (e.code === "Escape") { exitTestFlight(); return; }   // leave a test flight
+  if (e.code === "Escape") {                               // leave a test flight / abort training
+    if (game.tutorialActive) { finishTutorial("abort"); return; }
+    exitTestFlight(); return;
+  }
   keys.add(e.code);
   if (e.code === "Space") e.preventDefault();
   if (e.code === "KeyH" && game.testFlight) toggleUI();   // hide-all is a test-flight-only view
@@ -2123,6 +2248,7 @@ function update(dt) {
   updateHUD(gamma, dist, dCoord / Math.max(dt, 1e-4));
   updateLabels();
   updateTargetArrow();
+  if (game.tutorialActive && tutor) updateTutorial();
   // ~20 Hz is plenty for the audio smoothing (0.1–0.3 s time constants) and cuts
   // the AudioParam automation-event churn to a third
   if (++audioTick >= 3) { audioTick = 0; audio.update(ship.beta, ship.throttle, 0, feltSurge); }

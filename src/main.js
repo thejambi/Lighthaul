@@ -1361,7 +1361,7 @@ const FX_INFO = {
   doppler: ["Doppler shift",
     "Your motion squeezes light waves ahead of you toward blue and stretches the ones behind toward red. Push γ high enough and stars ahead shift right out of the visible band."],
   beaming: ["Relativistic beaming",
-    "The forward sky doesn't just shift colour — it gets brighter, focused at you like a headlight. The sky astern dims toward black."],
+    "The forward sky doesn't just shift color — it gets brighter, focused at you like a headlight. The sky astern dims toward black."],
   contraction: ["Length contraction",
     "Distances measure shorter along your direction of motion — at γ 10, the light-years ahead are ten times shorter in your frame. It's why high γ eats distance. Shown here as the view compressing."],
   cmb: ["CMB hotspot",

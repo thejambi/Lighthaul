@@ -69,6 +69,11 @@ or the featherweight high-skill **Interceptor** (sips fuel, turns on a spark,
 flies high-γ passenger work cheap, but a tiny tank and thin hull). Each is a
 different trade in Δv capacity, fuel economy, handling, and how much punishment
 the load takes; upgrades stack on top, so you patch a weakness over a career.
+Hulls are earned: the Hauler unlocks after retiring ranked *Journeyman Courier*,
+the Interceptor after *Master Courier*. New pilots get offered **Flight
+School** — a two-minute scripted training run (real physics, zero
+consequences) that teaches aiming, the fuel economy, the two clocks, the
+g-rating, and braking to dock.
 
 **Deep Space License.** Complete a delivery having touched **γ ≥ 25,000**
 (Redline Coils territory — the stock governor tops out at γ 1,000) and long-haul
@@ -84,7 +89,19 @@ docking assist — finally flies as one machine.
 *Deadhead* through *Lightspeed Legend* and, for the deep-space eras, up to
 *Redline Royalty*, *Deep Space Magnate*, and *The Ageless* — and your best
 careers (richest retirement, most deliveries, highest Lorentz γ ever reached)
-persist as records to beat on your next run.
+persist as records to beat on your next run. Retirement shows your **career
+log** (every run, pay, and the universe years it cost) and a **📋 SHARE RUN**
+button that copies an emoji summary for the group chat. Recent careers persist
+on the title screen with their seeds — tap one to refly that exact map.
+
+**Daily run.** The 📅 DAILY RUN button seeds today's shared cluster — everyone
+flying it gets the same map, shops, and opening offers. Compare share cards.
+
+**The story writes itself.** Docks remember when you last called, in universe
+time: return after centuries and the delivery summary tells you what changed —
+couriers are one-way time travellers, and the vignettes (plus your retirement
+epilogue) come straight from the clock math. Also installable as an app
+(manifest + offline-fallback service worker; 📲 chip on the title screen).
 
 **Star chart.** The dock's contract browser *is* a top-down map of the cluster:
 your three offers appear as gold routes, each labelled with its pay and g-rating

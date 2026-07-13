@@ -607,6 +607,7 @@ function placeStations(seed) {
       st = stations[i] = { el: div, dEl: div.querySelector(".d") };
     }
     st.name = b.name; st.pos = b.pos; st.shop = b.shop; st.deep = !!b.deep;
+    st.lastVisit = -1;  // universe time of your last call here (-1 = never) — feeds the vignettes
     st._shown = true;   // no inline display yet = visible; first label pass may need to hide it
     st.el.querySelector(".nm").textContent = b.name;
   });
@@ -701,6 +702,45 @@ function makeOffer(fromIdx, t) {
     maxAging: d / gReq * 1.25 + 1.5,
     pay: Math.round((160 + d * (0.7 + gReq * 0.2)) * (1 + Math.max(0, 8 - gLimit) * 0.06)),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Time-lapse vignettes — the story the physics writes for free. Every dock
+// remembers WHEN (universe time) you last called; the gap between visits picks
+// a line for the delivery summary. Couriers are one-way time travellers: the
+// worlds live in history, and you drop in on it.
+// ---------------------------------------------------------------------------
+function makeVignette(st, now) {
+  const nm = st.name.replace(_SUFFIX_RE, "");
+  const pick = (a) => a[(Math.random() * a.length) | 0];
+  if (st.lastVisit === undefined || st.lastVisit < 0) {
+    return pick([
+      `First call at ${nm} — the Guild ledger opens a page for you.`,
+      `Nobody at ${nm} has met you before. The ledger vouches for you anyway; it always does.`,
+      `A new dock, a new dialect. The Guild seal on your hull does the talking.`,
+    ]);
+  }
+  const gap = now - st.lastVisit;
+  if (gap < 60) return pick([
+    `${fmtY(gap)} since you left — the dockmaster still remembers your name.`,
+    `Barely ${fmtY(gap)} here since your last call. The scuff you left on the pad hasn't been painted over.`,
+    `${fmtY(gap)} on their clocks. The same song is still playing in the concourse.`,
+  ]);
+  if (gap < 300) return pick([
+    `${fmtY(gap)} gone. The dockmaster's granddaughter runs the desk now — she's heard stories about you.`,
+    `New banners, a new anthem. Your last visit is a line in the harbour registry, ${fmtY(gap)} back.`,
+    `Everyone you dealt with here has retired. Their successors honour the old rates — Guild law.`,
+  ]);
+  if (gap < 1000) return pick([
+    `You left a town and docked at a city. ${fmtY(gap)} of ${nm}'s history happened while you cruised.`,
+    `Your old berth is a heritage site now. They gave you the one next to it — ${fmtY(gap)} later.`,
+    `${fmtY(gap)} since your last landing. A statue in the concourse wears a flight suit like yours.`,
+  ]);
+  return pick([
+    `${fmtY(gap)} since you last stood here — your landing is in their founding mural. A child asks if you're really the same pilot. You are.`,
+    `Millennia turned while you flew. ${nm} remembers you the way it remembers weather — as legend.`,
+    `The language changed twice since your last call, ${fmtY(gap)} ago. The Guild ledger didn't.`,
+  ]);
 }
 
 function makeContracts(fromIdx) {
@@ -1440,6 +1480,7 @@ el("btn-tutorial-skip").addEventListener("click", () => {
 function depart(c) {
   game.contract = { ...c, acceptCoord: ship.coordTime, acceptShip: ship.shipTime };
   game.integrity = 1;
+  stations[game.station].lastVisit = ship.coordTime;   // this dock saw you leave just now
   ship.pos.copy(stations[game.station].pos);
   ship.throttle = 0;
   ship.beta = 0;
@@ -1497,8 +1538,11 @@ function dock() {
     notes.push(`◈ DEEP SPACE LICENSE earned — you delivered after touching γ ${fmtGamma(game.maxGamma)}. Long-haul stations are now on your chart.`);
     showEggToast("◈ DEEP SPACE LICENSE — long-haul brokers know your name");
   }
+  // the story the clocks wrote: how long this dock has waited since your last call
+  const vignette = makeVignette(stations[c.to], ship.coordTime);
+  stations[c.to].lastVisit = ship.coordTime;
   game.station = c.to;
-  game.lastResult = { kind: "dock", ok, pay, usedCoord, usedShip, notes, c };
+  game.lastResult = { kind: "dock", ok, pay, usedCoord, usedShip, notes, c, vignette };
   game.contract = null;
   audio.warpSweep(ok);
   setPhase("results");
@@ -1542,7 +1586,8 @@ function buildResults() {
       `ship time aboard <b>${r.usedShip.toFixed(2)} yr</b>` +
       (r.c.type === "passenger" ? ` (limit ${r.c.maxAging.toFixed(1)} yr)` : "") + `<br/>` +
       (r.notes.length ? `<span class="bad">${r.notes.join("<br/>")}</span><br/>` : "") +
-      `paid <b class="${r.ok ? "gold-t" : "bad"}">₡${r.pay}</b>`;
+      `paid <b class="${r.ok ? "gold-t" : "bad"}">₡${r.pay}</b>` +
+      (r.vignette ? `<div class="vignette">${r.vignette}</div>` : "");
   }
 }
 el("rs-continue").addEventListener("click", () => {
@@ -1569,10 +1614,18 @@ function buildGameOver() {
   updateTitleRecords();
   const star = (on) => on ? ` <span class="rec-new">★ record</span>` : "";
   el("go-title").textContent = forced ? "Mandatory retirement" : "Retired";
+  // the epilogue the clocks wrote
+  const aged = game.pilotAge - START_AGE;
+  const epilogue = ship.coordTime < 200
+    ? `A short career by universe reckoning — but every year of it was yours.`
+    : ship.coordTime < 2000
+      ? `You watched ${fmtY(ship.coordTime)} of history pass a cockpit window — and spent ${fmtY(ship.shipTime)} of your own to see it.`
+      : `Empires rose, archived themselves, and became footnotes while you flew. ${fmtY(ship.coordTime)} passed out there; you aged ${aged.toFixed(1)} years. The Guild calls that a career.`;
   const nxt = nextRank(game.credits);
   el("go-body").innerHTML =
     `<div class="rank">rank earned · <b class="gold-t">${rankFor(game.credits)}</b>` +
     (nxt ? `<span class="rank-next">next · ${nxt[1]} at ₡${nxt[0].toLocaleString()}</span>` : "") + `</div>` +
+    `<div class="vignette">${epilogue}</div>` +
     `You hung up the flight suit at <b>${game.pilotAge.toFixed(1)}</b>, flying the <b>${shipCls().name}</b>.<br/>` +
     `While you flew, the universe aged <b>${fmtY(ship.coordTime)}</b> — ` +
     `you lived <b>${fmtY(ship.shipTime)}</b> of it aboard.<br/>` +
@@ -1692,6 +1745,7 @@ function applyClass(key) {
   debugArmed = false;
   const seedEl = el("seed-input");
   placeStations(seedEl ? seedEl.value.trim() : "");   // typed seed, or a fresh random one
+  stations[game.station].lastVisit = 0;               // home dock: the career starts here
   setPhase("station");
 }
 buildClassSelect();

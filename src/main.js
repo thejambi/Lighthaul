@@ -2329,6 +2329,9 @@ function update(dt) {
     const apDist = apTgt.pos.distanceTo(ship.pos);
     _dir.copy(apTgt.pos).sub(ship.pos).normalize();
     const decel = apDecelRate(game.contract.gLimit);
+    // never fight the pilot: while they're actively thrusting UP (stopped short
+    // and correcting), the assist yields — and resumes the moment they let go
+    const playerUp = keys.has("KeyW") || keys.has("ArrowUp") || touchThrottleRate > 0;
     if (_fwd.dot(_dir) > 0.2) {
       // pre-filter before running the brake sim each frame; a full-redline brake
       // can eat well past 200 ly, so licensed pilots get a wider window
@@ -2336,7 +2339,7 @@ function update(dt) {
           apDist - DOCK_RADIUS <= apBrakeDistance(ship.beta, decel)) {
         apBraking = true;
       }
-      if (apBraking && apDist >= DOCK_RADIUS) {
+      if (apBraking && apDist >= DOCK_RADIUS && !playerUp) {
         // outside dock range, throttle-down is floored at a slow drift so the
         // ship keeps creeping in rather than stopping short of the dock
         ship.throttle = Math.max(betaToThrottle(0.15), ship.throttle - decel * dt);
@@ -2344,7 +2347,7 @@ function update(dt) {
     }
     // inside dock range, keep easing the throttle to a full stop at that same
     // capped, g-respecting rate — a hot arrival still has to bleed off its speed
-    if (apDist < DOCK_RADIUS) ship.throttle = Math.max(0, ship.throttle - decel * dt);
+    if (apDist < DOCK_RADIUS && !playerUp) ship.throttle = Math.max(0, ship.throttle - decel * dt);
   }
 
   // --- speed easing + FUEL: burn |Δrapidity| (proper Δv of the maneuver) ---
@@ -2564,7 +2567,8 @@ function updateHUD(gamma, dist, coordRate) {
     status = "⚠ OVER INERTIAL RATING — ease off";
     cls = "brake";
   } else if (dist < DOCK_RADIUS) {
-    status = ship.beta < DOCK_BETA ? "DOCKING…" : "IN RANGE — slow below 0.20c";
+    // with the assist flying the brake, don't nag the pilot to slow down
+    status = ship.beta < DOCK_BETA ? "DOCKING…" : (autopilotAssist ? "◈ AUTOPILOT DOCKING…" : "IN RANGE — slow below 0.20c");
     cls = "dockable";
   } else if (bearing < 0) {
     status = "⚠ TARGET ASTERN — turn back to the marker";
@@ -2572,7 +2576,7 @@ function updateHUD(gamma, dist, coordRate) {
   } else if (apBraking) {
     status = "◈ AUTOPILOT DOCKING…";
     cls = "dockable";
-  } else if (dist < brakeDist) {
+  } else if (dist < brakeDist && !autopilotAssist) {
     status = "⚠ CUT THROTTLE — braking distance";
     cls = "brake";
   }

@@ -352,6 +352,19 @@
   .vignette { margin: 12px 0 4px; padding: 8px 12px; border-left: 2px solid rgba(255,215,106,.55);
     font-style: italic; font-size: 12.5px; line-height: 1.7; color: var(--hud-dim); }
 
+  /* settings screen: toggles with physics blurbs */
+  .set-hd { font-size: 11px; letter-spacing: 1.5px; color: var(--hud-dim); margin: 16px 0 6px;
+    border-top: 1px solid rgba(143,233,255,.15); padding-top: 12px; }
+  .set-sub { letter-spacing: .3px; text-transform: none; font-size: 10px; }
+  .set-row { display: flex; align-items: center; gap: 14px; padding: 10px 12px; margin: 7px 0;
+    border: 1px solid rgba(143,233,255,.2); border-radius: 8px; background: rgba(0,0,0,.25); }
+  .set-main { flex: 1; font-size: 13px; color: #fff; line-height: 1.35; }
+  .set-desc { display: block; font-size: 11px; color: var(--hud-dim); line-height: 1.6; margin-top: 3px; }
+  .set-toggle { margin: 0; min-width: 62px; text-align: center; flex: none; }
+  .set-toggle.off { opacity: .45; color: var(--hud-dim); }
+  .set-controls { font-size: 11.5px; line-height: 1.9; color: var(--hud-dim); padding: 4px 2px; }
+  .set-controls b { color: var(--hud); }
+
   /* career journal: the retirement log + the title screen's replayable history */
   .journal { margin-top: 12px; font-size: 12px; }
   .journal summary { cursor: pointer; pointer-events: auto; color: var(--hud-dim); letter-spacing: 1px; }
@@ -405,7 +418,8 @@
   .debug-chip { font-size: 10px; letter-spacing: 1.5px; color: var(--gold);
     border: 1px solid rgba(255,215,106,.5); border-radius: 10px; padding: 2px 9px;
     background: rgba(255,215,106,.1); }
-  .dock-foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(143,233,255,.12);
+  .dock-foot { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(143,233,255,.12);
     text-align: center; }
   .seed-chip { font: inherit; font-size: 10px; letter-spacing: 1px; color: var(--hud-dim);
     background: rgba(0,0,0,.25); border: 1px solid rgba(143,233,255,.2); border-radius: 10px;
@@ -613,7 +627,10 @@
       <p style="margin-top:12px; font-size:11px">Accepting a contract undocks you with a frozen <b>10-second</b> window to find and aim at the target (thrust to launch early).
          Cut throttle in time — you dock below <b>0.20c</b> within <b>15 ly</b>. The <b>TOW</b> button (or <b>R</b>) recovers you if you're stranded.</p>
       <div id="st-ship"></div>
-      <div class="dock-foot"><button id="st-seed" class="seed-chip" title="Copy map seed to clipboard"></button></div>
+      <div class="dock-foot">
+        <button id="st-seed" class="seed-chip" title="Copy map seed to clipboard"></button>
+        <button id="st-settings" class="seed-chip" title="Sound & relativistic effects">⚙ settings</button>
+      </div>
     </div>
   </div>
 
@@ -632,6 +649,27 @@
         <button class="btn" id="shipcard-back">◂ BACK TO DOCK</button>
         <button class="btn gold" id="shipcard-test">▸ TEST FLIGHT</button>
       </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS (an overlay on the dock, like the ship card — no contract re-roll) -->
+  <div id="settings" class="screen hiddenS">
+    <div class="card" style="max-width:640px">
+      <h2>Settings</h2>
+      <div class="set-hd">SOUND</div>
+      <div class="set-row">
+        <span class="set-main"><b>Flight audio</b>
+          <span class="set-desc">Procedural engine drone, slipstream, and warp sweeps — no recordings, all synthesized live.</span></span>
+        <button class="btn set-toggle" id="set-sound">ON</button>
+      </div>
+      <div class="set-hd">RELATIVISTIC EFFECTS <span class="set-sub">· real physics, rendered per-star — visual only, the economy stays exact · keys 1–5 in flight</span></div>
+      <div id="set-fx"></div>
+      <div class="set-hd">CONTROLS</div>
+      <div class="set-controls">
+        <b>Touch:</b> drag space to steer · tap a station marker to auto-aim · hold the thrust-bar zones (▲ fine, ▲▲ turbo, ▲▲▲ warp) · TOW button when stranded<br/>
+        <b>Keys:</b> W/S throttle · Shift turbo · X warp · Q/E roll · mouse-drag steer · R tow · M mute · 1–5 effects
+      </div>
+      <button class="btn" id="settings-back" style="margin-top:14px">◂ BACK TO DOCK</button>
     </div>
   </div>
 

@@ -799,9 +799,9 @@ function makeContracts(fromIdx) {
 // Phase / screens
 // ---------------------------------------------------------------------------
 const el = (id) => document.getElementById(id);
-// #shipcard is listed so setPhase hides it on any real transition; it's never a
-// phase itself — it's opened as an overlay on the station screen.
-const screens = { title: el("title"), select: el("select"), station: el("station"), results: el("results"), over: el("gameover"), ship: el("shipcard") };
+// #shipcard and #settings are overlays on the station screen (never phases
+// themselves) — listed so setPhase hides them on any real transition.
+const screens = { title: el("title"), select: el("select"), station: el("station"), results: el("results"), over: el("gameover"), ship: el("shipcard"), settings: el("settings") };
 
 function setPhase(p) {
   game.phase = p;
@@ -1348,6 +1348,52 @@ function buildShipStats() {
 
 el("st-ship").addEventListener("click", openShip);
 el("shipcard-back").addEventListener("click", closeShip);
+
+// ---------------------------------------------------------------------------
+// Settings — an overlay on the dock (⚙ chip in the footer). Sound + the five
+// relativistic-effect toggles, each with a line of real physics: the toggles
+// double as a tiny lesson in what the engine is showing you. Closing returns
+// to the dock WITHOUT setPhase, so the contract offers don't re-roll.
+// ---------------------------------------------------------------------------
+const FX_INFO = {
+  aberration: ["Aberration",
+    "Near light speed, the whole sky crowds toward your nose — like rain streaking toward a fast car's windshield, but with starlight. Look astern and the stars thin out."],
+  doppler: ["Doppler shift",
+    "Your motion squeezes light waves ahead of you toward blue and stretches the ones behind toward red. Push γ high enough and stars ahead shift right out of the visible band."],
+  beaming: ["Relativistic beaming",
+    "The forward sky doesn't just shift colour — it gets brighter, focused at you like a headlight. The sky astern dims toward black."],
+  contraction: ["Length contraction",
+    "Distances measure shorter along your direction of motion — at γ 10, the light-years ahead are ten times shorter in your frame. It's why high γ eats distance. Shown here as the view compressing."],
+  cmb: ["CMB hotspot",
+    "The Big Bang's afterglow is normally invisible microwaves. Fly fast enough and Doppler drags it into view — a glow dead ahead that no human has ever been fast enough to see."],
+};
+
+function openSettings() { buildSettings(); el("settings").classList.remove("hiddenS"); }
+function closeSettings() { el("settings").classList.add("hiddenS"); }
+
+function buildSettings() {
+  const snd = el("set-sound");
+  snd.textContent = audio.isMuted() ? "OFF" : "ON";
+  snd.classList.toggle("off", audio.isMuted());
+  const box = el("set-fx");
+  box.innerHTML = Object.entries(FX_INFO).map(([k, [nm, desc]]) =>
+    `<div class="set-row"><span class="set-main"><b>${nm}</b><span class="set-desc">${desc}</span></span>` +
+    `<button class="btn set-toggle ${fx[k] ? "" : "off"}" data-fx="${k}">${fx[k] ? "ON" : "OFF"}</button></div>`).join("");
+  box.querySelectorAll("[data-fx]").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.fx;
+    fx[k] ^= 1; saveSettings();
+    b.textContent = fx[k] ? "ON" : "OFF";
+    b.classList.toggle("off", !fx[k]);
+  }));
+}
+el("st-settings").addEventListener("click", openSettings);
+el("settings-back").addEventListener("click", closeSettings);
+el("set-sound").addEventListener("click", () => {
+  audio.toggleMute(); updateSoundIndicator(); saveSettings();
+  const snd = el("set-sound");
+  snd.textContent = audio.isMuted() ? "OFF" : "ON";
+  snd.classList.toggle("off", audio.isMuted());
+});
 
 // ---------------------------------------------------------------------------
 // Test flight — take the current ship out for a free spin. No contract, clock,

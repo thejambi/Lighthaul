@@ -1365,7 +1365,7 @@ const FX_INFO = {
   contraction: ["Length contraction",
     "Distances measure shorter along your direction of motion — at γ 10, the light-years ahead are ten times shorter in your frame. It's why high γ eats distance. Shown here as the view compressing."],
   cmb: ["CMB hotspot",
-    "The Big Bang's afterglow is normally invisible microwaves. Fly fast enough and Doppler drags it into view — a glow dead ahead that no human has ever been fast enough to see."],
+    "Creation's afterglow is normally invisible microwaves. Fly fast enough and Doppler drags it into view — a glow dead ahead that no human has ever been fast enough to see."],
 };
 
 function openSettings() { buildSettings(); el("settings").classList.remove("hiddenS"); }

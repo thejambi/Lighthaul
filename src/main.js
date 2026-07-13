@@ -88,19 +88,19 @@ const UPGRADES = {
 // `pips` (1–5) are display-only ratings for the select screen.
 const CLASSES = {
   courier: {
-    name: "Courier", tag: "FORGIVING",
+    name: "Courier", tag: "FORGIVING", unlock: 0,
     tank: 14, fuelEff: 1.0, damper: 0.85, handling: 1.0, credits: 450,
     pips: { tank: 3, fuel: 3, handling: 3, care: 5 },
     blurb: "Balanced and gentle on the load — quick to point, hard to wreck. The pilot's-first-ship all-rounder.",
   },
   hauler: {
-    name: "Hauler", tag: "BULK CARGO",
+    name: "Hauler", tag: "BULK CARGO", unlock: 3000,      // retire ranked Journeyman Courier
     tank: 20, fuelEff: 1.12, damper: 1.2, handling: 0.7, credits: 320,
     pips: { tank: 5, fuel: 2, handling: 1, care: 2 },
     blurb: "A big-tank freighter for long, fast rugged-cargo runs. Turns like a moon and feels every G — keep fragile passengers off it.",
   },
   interceptor: {
-    name: "Interceptor", tag: "HIGH SKILL",
+    name: "Interceptor", tag: "HIGH SKILL", unlock: 6000, // retire ranked Master Courier
     tank: 10, fuelEff: 0.8, damper: 1.15, handling: 1.45, credits: 300,
     pips: { tank: 1, fuel: 5, handling: 5, care: 2 },
     blurb: "A featherweight racer: sips fuel, turns on a spark, flies high-γ passenger work cheap. Tiny tank, thin hull — precise hands only.",
@@ -1435,8 +1435,16 @@ function buildGameOver() {
   // Otherwise commit exactly once per career (setPhase("over") only fires on a
   // real transition, but guard anyway so a re-render can't double-count).
   const noRecord = { balance: false, earned: false, deliveries: false, gamma: false };
+  const prevBest = records.bestBalance;      // to detect hull unlocks crossed this career
   const beat = (game.debug || game._recorded) ? noRecord : commitCareer();
   game._recorded = true;
+  // hull unlocks earned by this retirement
+  let unlockHtml = "";
+  for (const [key, c] of Object.entries(CLASSES)) {
+    if (c.unlock > 0 && prevBest < c.unlock && records.bestBalance >= c.unlock) {
+      unlockHtml += `<div class="ship-unlock">★ ${c.name.toUpperCase()} UNLOCKED — a new hull waits on the select screen</div>`;
+    }
+  }
   updateTitleRecords();
   const star = (on) => on ? ` <span class="rec-new">★ record</span>` : "";
   el("go-title").textContent = forced ? "Mandatory retirement" : "Retired";
@@ -1452,6 +1460,7 @@ function buildGameOver() {
     `peak <b>γ ${fmtGamma(game.maxGamma)}</b>${star(beat.gamma)}<br/>` +
     `Career earnings <b class="gold-t">₡${game.earned}</b>${star(beat.earned)} · ` +
     `final balance <b class="gold-t">₡${game.credits}</b>${star(beat.balance)}` +
+    unlockHtml +
     (game.debug ? `<div class="alltime">◈ debug career — not recorded</div>` :
     `<div class="alltime">— all-time —&nbsp; richest retirement <b class="gold-t">₡${records.bestBalance}</b>` +
     ` · most deliveries <b>${records.mostDeliveries}</b> · top <b>γ ${fmtGamma(records.topGamma)}</b>` +
@@ -1498,6 +1507,10 @@ function start() {
 }
 el("title").addEventListener("click", start);
 
+// Hulls unlock on your best retirement: prove yourself in the Courier first.
+// (Debug bypasses; test flights of locked hulls stay allowed as a teaser.)
+function shipUnlocked(key) { return debugArmed || records.bestBalance >= CLASSES[key].unlock; }
+
 // ship-class picker (shown once, at the top of a career)
 function buildClassSelect() {
   const box = el("class-list");
@@ -1506,8 +1519,9 @@ function buildClassSelect() {
   const stat = (lab, n) => `<div class="cc-stat"><span class="cc-lab">${lab}</span><span class="pips">${pipBar(n)}</span></div>`;
   box.innerHTML = "";
   for (const [key, c] of Object.entries(CLASSES)) {
+    const unlocked = shipUnlocked(key);
     const div = document.createElement("div");
-    div.className = "classcard";
+    div.className = "classcard" + (unlocked ? "" : " locked");
     div.innerHTML =
       `<div class="cc-art" data-cls="${key}" title="Take it for a test flight">${SHIP_ART[key]}` +
       `<span class="cc-testhint">▸ test fly</span></div>` +
@@ -1517,7 +1531,10 @@ function buildClassSelect() {
       stat("handling", c.pips.handling) + stat("cargo care", c.pips.care) +
       `<div class="cc-stat"><span class="cc-lab">start credits</span><span class="cc-credits gold-t">₡${c.credits}</span></div>` +
       `<div class="cc-blurb">${c.blurb}</div>` +
-      `<button class="btn gold" data-cls="${key}">FLY THE ${c.name.toUpperCase()}</button>`;
+      (unlocked
+        ? `<button class="btn gold" data-cls="${key}">FLY THE ${c.name.toUpperCase()}</button>`
+        : `<div class="cc-locknote">🔒 retire ranked <b>${rankFor(c.unlock)}</b> (₡${c.unlock.toLocaleString()}) to unlock` +
+          `<span class="cc-locksub">test flights allowed</span></div>`);
     box.appendChild(div);
   }
   box.querySelectorAll("button[data-cls]").forEach((b) =>
@@ -1535,7 +1552,8 @@ function buildClassSelect() {
     eggTapTimer = setTimeout(() => (eggTaps = 0), 1200);
     if (eggTaps >= 5) {
       eggTaps = 0; debugArmed = true;
-      badge.classList.add("armed");
+      buildClassSelect();                      // debug unlocks every hull — rebuild the cards
+      el("egg-badge").classList.add("armed");
       showEggToast("◈ DEBUG ARMED — pick a ship to fly it");
     }
   });
@@ -1543,6 +1561,7 @@ function buildClassSelect() {
 let debugArmed = false, eggTaps = 0, eggTapTimer = null;
 
 function applyClass(key) {
+  if (!shipUnlocked(key)) return;
   game.cls = key;
   const c = CLASSES[key];
   game.credits = c.credits;

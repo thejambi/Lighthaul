@@ -164,6 +164,7 @@ const game = {
   deepLicense: false,         // earned by delivering after touching γ ≥ DEEP_GAMMA — opens long-haul space
   upgrades: { tank: 0, drive: 0, damper: 0, broker: 0, rejuv: 0, overdrive: 0, autopilot: 0 },
   lastResult: null,
+  journal: [],                // this career's runs, shown as the log at retirement
 };
 
 // --- persistent records (localStorage): the one thing that outlives a career,
@@ -207,8 +208,20 @@ function commitCareer() {                 // fold this career into the saved bes
   records.topGamma = Math.max(records.topGamma, game.maxGamma);
   records.careers += 1;
   try { localStorage.setItem(RECORDS_KEY, JSON.stringify(records)); } catch (_) {}
+  // career history: seed included so any past map is one tap from a replay
+  careers.unshift({
+    d: new Date().toISOString().slice(0, 10), seed: worldSeed, ship: shipCls().name,
+    rank: rankFor(game.credits), bal: game.credits, del: game.deliveries,
+    coordY: Math.round(ship.coordTime),
+  });
+  careers.length = Math.min(careers.length, 20);
+  try { localStorage.setItem(CAREERS_KEY, JSON.stringify(careers)); } catch (_) {}
   return beat;
 }
+
+// past careers (persisted): what you flew, how it ended, and the seed to refly it
+const CAREERS_KEY = "lighthaul.careers.v1";
+const careers = (() => { try { return JSON.parse(localStorage.getItem(CAREERS_KEY)) || []; } catch (_) { return []; } })();
 
 const ship = {
   pos: new THREE.Vector3(),
@@ -1554,6 +1567,7 @@ function dock() {
   const vignette = makeVignette(stations[c.to], ship.coordTime);
   stations[c.to].lastVisit = ship.coordTime;
   game.station = c.to;
+  game.journal.push({ ok, what: c.what, to: stations[c.to].name, pay, coordY: usedCoord });
   game.lastResult = { kind: "dock", ok, pay, usedCoord, usedShip, notes, c, vignette };
   game.contract = null;
   audio.warpSweep(ok);
@@ -1576,6 +1590,7 @@ function callTow() {
   game.fuel = Math.max(game.fuel, tankCap() * 0.5);
   game.station = nearest;
   game.failures++;
+  game.journal.push({ ok: false, what: "towed off a dead stick", to: stations[nearest].name, pay: -cost, coordY: 0 });
   game.lastResult = { kind: "tow", cost, c, nearest };
   game.contract = null;
   setPhase("results");
@@ -1624,6 +1639,7 @@ function buildGameOver() {
     }
   }
   updateTitleRecords();
+  updateTitleCareers();
   const star = (on) => on ? ` <span class="rec-new">★ record</span>` : "";
   el("go-title").textContent = forced ? "Mandatory retirement" : "Retired";
   // the epilogue the clocks wrote
@@ -1650,7 +1666,12 @@ function buildGameOver() {
     (game.debug ? `<div class="alltime">◈ debug career — not recorded</div>` :
     `<div class="alltime">— all-time —&nbsp; richest retirement <b class="gold-t">₡${records.bestBalance}</b>` +
     ` · most deliveries <b>${records.mostDeliveries}</b> · top <b>γ ${fmtGamma(records.topGamma)}</b>` +
-    ` · careers flown <b>${records.careers}</b></div>`);
+    ` · careers flown <b>${records.careers}</b></div>`) +
+    (game.journal.length ? `<details class="journal"><summary>📜 career log · ${game.journal.length} runs</summary>` +
+      `<div class="j-rows">` + game.journal.map((j) =>
+        `<div class="j-row"><span class="${j.ok ? "good" : "bad"}">${j.ok ? "✓" : "✗"}</span> ` +
+        `${j.what} → <b>${j.to}</b> · <span class="${j.pay < 0 ? "bad" : "gold-t"}">₡${j.pay}</span>` +
+        (j.coordY > 0 ? ` · ${fmtY(j.coordY)}` : "")).join("</div>") + `</div></div></details>` : "");
 }
 el("go-new").addEventListener("click", () => location.reload());
 
@@ -1677,6 +1698,26 @@ el("go-share").addEventListener("click", () => {
   copyText(buildShareText(), () => { b.textContent = "COPIED ✓"; setTimeout(() => (b.textContent = "📋 SHARE RUN"), 1800); });
 });
 
+// title-screen career history: recent runs with their seeds — tap one to
+// prefill the seed and refly that exact cluster
+function updateTitleCareers() {
+  const t = el("title-careers");
+  if (!t) return;
+  if (!careers.length) { t.style.display = "none"; return; }
+  t.style.display = "block";
+  t.innerHTML = `<div class="tc-hd">RECENT CAREERS · tap to refly a map</div>` + careers.slice(0, 5).map((c) =>
+    `<div class="tc-row" data-seed="${c.seed}">${rankEmoji(c.bal)} <b>${c.rank}</b> · ₡${c.bal.toLocaleString()}` +
+    ` · ${c.del} runs · ${c.ship} <span class="tc-seed">↻ ${c.seed}</span></div>`).join("");
+}
+el("title-careers").addEventListener("click", (e) => {
+  const row = e.target.closest("[data-seed]");
+  if (!row) return;
+  e.stopPropagation();                       // don't let the title tap double as "start"
+  el("seed-input").value = row.dataset.seed;
+  start();
+  showEggToast("↻ seed " + row.dataset.seed + " loaded — pick a ship");
+});
+
 // title-screen records line (hidden until you've retired at least once)
 function updateTitleRecords() {
   const t = el("title-records");
@@ -1690,6 +1731,7 @@ function updateTitleRecords() {
     ` · <span class="k">careers flown</span> <b>${records.careers}</b>`;
 }
 updateTitleRecords();
+updateTitleCareers();
 
 // ---------------------------------------------------------------------------
 // Input

@@ -352,6 +352,21 @@
   .vignette { margin: 12px 0 4px; padding: 8px 12px; border-left: 2px solid rgba(255,215,106,.55);
     font-style: italic; font-size: 12.5px; line-height: 1.7; color: var(--hud-dim); }
 
+  /* career journal: the retirement log + the title screen's replayable history */
+  .journal { margin-top: 12px; font-size: 12px; }
+  .journal summary { cursor: pointer; pointer-events: auto; color: var(--hud-dim); letter-spacing: 1px; }
+  .journal summary:hover { color: var(--hud); }
+  .j-rows { max-height: 180px; overflow-y: auto; margin-top: 8px; padding: 8px 10px;
+    border: 1px solid rgba(143,233,255,.18); border-radius: 8px; background: rgba(0,0,0,.25);
+    line-height: 1.9; }
+  #title-careers { margin: 12px auto 2px; max-width: 480px; text-align: left; }
+  .tc-hd { font-size: 10px; letter-spacing: 2px; color: var(--hud-dim); margin-bottom: 5px; text-align: center; }
+  .tc-row { cursor: pointer; pointer-events: auto; font-size: 11.5px; line-height: 1.9;
+    color: var(--hud-dim); padding: 1px 8px; border-radius: 6px; }
+  .tc-row:hover { color: var(--hud); background: rgba(143,233,255,.08); }
+  .tc-row b { color: var(--hud); }
+  .tc-seed { color: var(--gold); float: right; }
+
   /* flight school */
   #tutor { bottom: 120px; left: 50%; transform: translateX(-50%); max-width: 560px; z-index: 7;
     border-color: rgba(255,215,106,.55); pointer-events: none; }
@@ -552,6 +567,7 @@
         <div><b>You and your passengers age on ship time</b> — fly high-γ to stay young. Retire rich, not old.</div>
       </div>
       <div id="title-records" class="title-records" style="display:none"></div>
+      <div id="title-careers" style="display:none"></div>
       <div class="go" id="title-go">▶ click or press any key to report for duty</div>
       <button id="btn-install" class="seed-chip" style="display:none; margin-top:14px">📲 INSTALL APP</button>
     </div>

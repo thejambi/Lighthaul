@@ -835,7 +835,7 @@ function buildStation() {
     ` &nbsp;·&nbsp; deliveries <b>${game.deliveries}</b>`;
 
   const seedBtn = el("st-seed");
-  seedBtn.textContent = "seed " + worldSeed + " · tap to copy";
+  seedBtn.innerHTML = seedChipHtml("tap to copy");
   seedBtn.classList.remove("copied");
   el("st-debug").style.display = game.debug ? "" : "none";
 
@@ -965,9 +965,18 @@ function copyText(str, done) {
   } catch (_) { fb(); }
 }
 
+// Chip label for the current seed. Seeds are case-sensitive (they hash by char
+// code), so the value renders in a .sv span that opts out of the chip's
+// uppercase styling — what you read is exactly what you'd retype. Escaped
+// because the seed is player-typed text going through innerHTML.
+function seedChipHtml(suffix) {
+  const safe = worldSeed.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  return `seed <span class="sv">${safe}</span> · ${suffix}`;
+}
+
 el("st-seed").addEventListener("click", () => {
   const btn = el("st-seed");
-  copyText(worldSeed, () => { btn.textContent = "seed " + worldSeed + " · copied ✓"; btn.classList.add("copied"); });
+  copyText(worldSeed, () => { btn.innerHTML = seedChipHtml("copied ✓"); btn.classList.add("copied"); });
 });
 
 // ---------------------------------------------------------------------------

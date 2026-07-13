@@ -427,6 +427,8 @@
     transition: color .15s, border-color .15s, background .15s; }
   .seed-chip:hover { color: var(--hud); border-color: rgba(143,233,255,.5); background: rgba(8,20,28,.5); }
   .seed-chip.copied { color: var(--gold); border-color: rgba(255,215,106,.5); background: rgba(255,215,106,.1); }
+  /* seeds are case-sensitive — show the value verbatim inside the uppercased chip */
+  .seed-chip .sv { text-transform: none; color: var(--hud); }
 
   /* debug teleport control in the trip planner */
   .dbg-line { margin-top: 10px; display: flex; align-items: center; gap: 10px; }

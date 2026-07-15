@@ -1433,7 +1433,9 @@ function exitTestFlight() {
   if (!game.testFlight) return;
   game.testFlight = false;
   el("testBanner").style.display = "none";
-  el("contract").style.display = "";        // restore the tracker for real flights
+  // note: don't restore #contract here — updateHUD owns the tracker/summary pair
+  // and restores BOTH on the next contract frame. Restoring only one of them
+  // here defeated updateHUD's guard and left the DISTANCE·LOAD summary hidden.
   setPhase(testReturn);
 }
 el("tf-exit").addEventListener("click", exitTestFlight);

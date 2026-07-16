@@ -258,7 +258,7 @@ function awardBadge(id) {
     try { localStorage.setItem(BADGES_KEY, JSON.stringify(badges)); } catch (_) {}
     game.newBadges.push(id);
   }
-  showEggToast(first ? `🏅 ★ NEW COMMENDATION — ${BADGES[id].name}` : `🏅 COMMENDATION — ${BADGES[id].name}`);
+  showEggToastLong(first ? `🏅 ★ NEW COMMENDATION — ${BADGES[id].name}` : `🏅 COMMENDATION — ${BADGES[id].name}`);
 }
 // checks that can complete mid-career, run at every dock
 function checkDockBadges(usedCoord) {
@@ -2052,12 +2052,15 @@ function updateBadges() {
   refreshWarpZones();          // warp thrust zones follow Redline Coils ownership
 }
 let eggToastTimer = null;
-function showEggToast(text) {
+function showEggToast(text, messageLifeMultiplier = 1) {
   const t = el("eggToast");
   t.textContent = text;
   t.classList.add("show");
   clearTimeout(eggToastTimer);
-  eggToastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+  eggToastTimer = setTimeout(() => t.classList.remove("show"), 1600 * messageLifeMultiplier);
+}
+function showEggToastLong(text) {
+  showEggToast(text, 3);
 }
 
 // keyboard: Konami code  ↑ ↑ ↓ ↓ ← → ← → B A

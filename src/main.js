@@ -1691,6 +1691,8 @@ function buildGameOver() {
   const prevBest = records.bestBalance;      // to detect hull unlocks crossed this career
   const beat = (game.debug || game._recorded) ? noRecord : commitCareer();
   game._recorded = true;
+  // a debug run's scorecard isn't bragging material — no share button for it
+  el("go-share").style.display = game.debug ? "none" : "";
   // hull unlocks earned by this retirement
   let unlockHtml = "";
   for (const [key, c] of Object.entries(CLASSES)) {

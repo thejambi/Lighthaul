@@ -239,6 +239,7 @@ const ship = {
 const PROPER_RATE = 0.4;
 const GAMMA_CAP = 40;
 const REDLINE_RAMP = 1.2;     // past the softcap, a slow log climb (see pace()) so redline speeds keep gaining
+const REDLINE_SOFT = 6;       // ...with a gradual onset: bigger = gentler just past the cap (top end barely changes)
 const REDLINE_GAMMA = 2000;   // γ above which the HUD SPEED/Lorentz readouts go red + buzz
 // Deep Space License: complete a delivery having touched this γ (needs Redline
 // Coils L3+ — stock tops out at γ 1000) and long-haul brokers open up.
@@ -269,7 +270,11 @@ function gammaCap() { return GAMMA_CAP * (1 + 0.25 * game.upgrades.overdrive); }
 // in sync. Aging (d/βγ) and deadlines (d/β) are untouched — this is wall-clock only.
 function pace(gamma) {
   const gc = gammaCap();
-  return gc * Math.tanh(gamma / gc) + REDLINE_RAMP * gc * Math.log1p(Math.max(0, gamma / gc - 1));
+  // The log's argument is divided by REDLINE_SOFT so the tail wakes up gradually:
+  // just past the cap the onset slope is SOFT× gentler (ordinary 0.9999c cruising
+  // barely feels it), while deep redline loses only ln(SOFT) off an ln(x) that's
+  // ~10 there — the long-haul top end keeps nearly all of REDLINE_RAMP's punch.
+  return gc * Math.tanh(gamma / gc) + REDLINE_RAMP * gc * Math.log1p(Math.max(0, gamma / gc - 1) / REDLINE_SOFT);
 }
 
 function throttleToBeta(t) {

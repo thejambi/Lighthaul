@@ -8,6 +8,7 @@
 <link rel="alternate icon" href="favicon-32.png" type="image/png" sizes="32x32" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <link rel="manifest" href="manifest.webmanifest" />
+<link href="https://fonts.googleapis.com/css2?family=Cookie&display=swap" rel="stylesheet" />
 <meta name="theme-color" content="#02040a" />
 <meta name="description" content="A relativistic courier game — haul cargo and passengers at a hair under light speed, and let special relativity be the economy." />
 <style>
@@ -352,6 +353,18 @@
   .vignette { margin: 12px 0 4px; padding: 8px 12px; border-left: 2px solid rgba(255,215,106,.55);
     font-style: italic; font-size: 12.5px; line-height: 1.7; color: var(--hud-dim); }
 
+  /* buy-me-a-tea support button (title + ship select) — hand-rolled in the BMC
+     style (their widget script is document.write-based: single-button, parser-
+     blocking, incompatible with two placements) */
+  .support { display: flex; justify-content: center; margin-top: 16px; pointer-events: auto; }
+  .bmc-btn { display: inline-flex; align-items: center; gap: 8px; pointer-events: auto; cursor: pointer;
+    font-family: 'Cookie', cursive; font-size: 24px; line-height: 1; color: #000000;
+    background: #FFDD00; border: 1px solid #000000; border-radius: 10px; padding: 9px 18px 11px;
+    text-decoration: none; text-shadow: none; box-shadow: 0 2px 8px rgba(0,0,0,.45);
+    transition: transform .12s, box-shadow .12s; }
+  .bmc-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.55); }
+  .bmc-btn .e { font-size: 19px; }
+
   /* settings screen: toggles with physics blurbs */
   .set-hd { font-size: 11px; letter-spacing: 1.5px; color: var(--hud-dim); margin: 16px 0 6px;
     border-top: 1px solid rgba(143,233,255,.15); padding-top: 12px; }
@@ -586,6 +599,9 @@
       <div id="title-careers" style="display:none"></div>
       <div class="go" id="title-go">▶ click or press any key to report for duty</div>
       <button id="btn-install" class="seed-chip" style="display:none; margin-top:14px">📲 INSTALL APP</button>
+      <div class="support" id="bmc-title">
+        <a class="bmc-btn" href="https://buymeacoffee.com/zburnham" target="_blank" rel="noopener"><span class="e">☕</span><span>Buy me a tea</span></a>
+      </div>
     </div>
   </div>
 
@@ -607,6 +623,9 @@
         <input id="seed-input" type="text" maxlength="16" placeholder="random" autocomplete="off" spellcheck="false"/>
         <button class="btn" id="btn-daily" title="Everyone flying today's run shares this cluster">📅 DAILY RUN</button>
         <span class="seed-note">optional — reuse a seed to replay the same cluster · <a id="link-tutorial">🎓 flight school</a></span>
+      </div>
+      <div class="support">
+        <a class="bmc-btn" href="https://buymeacoffee.com/zburnham" target="_blank" rel="noopener"><span class="e">☕</span><span>Buy me a tea</span></a>
       </div>
     </div>
   </div>

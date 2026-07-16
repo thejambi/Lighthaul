@@ -1825,6 +1825,8 @@ function start() {
   setPhase("select");           // choose a ship before the first contract
 }
 el("title").addEventListener("click", start);
+// tapping the support button shouldn't ALSO start the game (title starts on any click)
+el("bmc-title").addEventListener("click", (e) => e.stopPropagation());
 
 // Hulls unlock on your best retirement: prove yourself in the Courier first.
 // (Debug bypasses; test flights of locked hulls stay allowed as a teaser.)

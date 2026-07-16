@@ -169,7 +169,8 @@ const game = {
   visits: {},                 // station index → docks this career (feeds the map commendations)
   flawless: 0,                // deliveries landed at 100% integrity this career
   tows: 0,                    // recovery tows called this career
-  newBadges: [],              // commendations earned this career (shown at retirement)
+  careerBadges: [],           // every commendation earned THIS career — a repeatable run goal
+  newBadges: [],              // the subset earned for the first time ever (they get the ★)
 };
 
 // --- persistent records (localStorage): the one thing that outlives a career,
@@ -245,12 +246,19 @@ const BADGES = {
 };
 const BADGES_KEY = "lighthaul.badges.v1";
 const badges = (() => { try { return JSON.parse(localStorage.getItem(BADGES_KEY)) || {}; } catch (_) { return {}; } })();
+// A badge can be RE-earned every career (once per career) — "how many in one
+// run" is the repeatable game. The persistent set only decides who gets the ★.
 function awardBadge(id) {
-  if (badges[id] || game.debug || game.tutorialActive) return;
-  badges[id] = new Date().toISOString().slice(0, 10);
-  try { localStorage.setItem(BADGES_KEY, JSON.stringify(badges)); } catch (_) {}
-  game.newBadges.push(id);
-  showEggToast(`🏅 COMMENDATION — ${BADGES[id].name}`);
+  if (game.debug || game.tutorialActive) return;
+  if (game.careerBadges.includes(id)) return;      // already earned this career
+  game.careerBadges.push(id);
+  const first = !badges[id];
+  if (first) {
+    badges[id] = new Date().toISOString().slice(0, 10);
+    try { localStorage.setItem(BADGES_KEY, JSON.stringify(badges)); } catch (_) {}
+    game.newBadges.push(id);
+  }
+  showEggToast(first ? `🏅 ★ NEW COMMENDATION — ${BADGES[id].name}` : `🏅 COMMENDATION — ${BADGES[id].name}`);
 }
 // checks that can complete mid-career, run at every dock
 function checkDockBadges(usedCoord) {
@@ -1769,8 +1777,13 @@ function buildGameOver() {
   updateTitleBadges();
   const star = (on) => on ? ` <span class="rec-new">★ record</span>` : "";
   el("go-title").textContent = forced ? "Mandatory retirement" : "Retired";
-  const badgeHtml = game.newBadges.map((id) =>
-    `<div class="ship-unlock">🏅 COMMENDATION — ${BADGES[id].name}: <span class="badge-desc">${BADGES[id].desc.toLowerCase()}</span></div>`).join("");
+  const badgeHtml = game.careerBadges.length
+    ? `<div class="career-badges"><div class="cb-hd">🏅 COMMENDATIONS THIS CAREER · ${game.careerBadges.length}/${Object.keys(BADGES).length}</div>` +
+      game.careerBadges.map((id) =>
+        `<div class="cb-row">${BADGES[id].icon} <b>${BADGES[id].name}</b>` +
+        (game.newBadges.includes(id) ? ` <span class="rec-new">★ first time</span>` : "") +
+        ` <span class="badge-desc">— ${BADGES[id].desc.toLowerCase()}</span></div>`).join("") + `</div>`
+    : "";
   // the epilogue the clocks wrote
   const aged = game.pilotAge - START_AGE;
   const epilogue = ship.coordTime < 200
@@ -1820,6 +1833,7 @@ function buildShareText() {
     `📦 ${game.deliveries} deliveries · ₡${game.credits.toLocaleString()}\n` +
     `⏳ ${fmtY(ship.coordTime)} passed · 🧑‍🚀 aged ${(game.pilotAge - START_AGE).toFixed(1)} yr\n` +
     `⚡ peak γ ${fmtGamma(game.maxGamma)}\n` +
+    (game.careerBadges.length ? `🏅 ${game.careerBadges.length}/${Object.keys(BADGES).length} commendations\n` : "") +
     `🌱 seed ${worldSeed}`;
 }
 el("go-share").addEventListener("click", () => {
@@ -1970,7 +1984,7 @@ function applyClass(key) {
   game.dailyRun = worldSeed === dailySeed();          // flying today's shared cluster?
   stations[game.station].lastVisit = 0;               // home dock: the career starts here
   game.visits = { [game.station]: 1 };                // commendation trackers start clean
-  game.flawless = 0; game.tows = 0; game.newBadges = [];
+  game.flawless = 0; game.tows = 0; game.careerBadges = []; game.newBadges = [];
   setPhase("station");
 }
 buildClassSelect();

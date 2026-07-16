@@ -238,7 +238,7 @@ const ship = {
 // (soft-capped) — length contraction made real.
 const PROPER_RATE = 0.4;
 const GAMMA_CAP = 40;
-const REDLINE_RAMP = 1.2;     // past the softcap, a slow log climb (see pace()) so redline speeds keep gaining
+const REDLINE_RAMP = 1.5;     // past the softcap, a slow log climb (see pace()) so redline speeds keep gaining
 const REDLINE_SOFT = 6;       // ...with a gradual onset: bigger = gentler just past the cap (top end barely changes)
 const REDLINE_GAMMA = 2000;   // γ above which the HUD SPEED/Lorentz readouts go red + buzz
 // Deep Space License: complete a delivery having touched this γ (needs Redline

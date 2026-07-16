@@ -94,6 +94,13 @@ log** (every run, pay, and the universe years it cost) and a **📋 SHARE RUN**
 button that copies an emoji summary for the group chat. Recent careers persist
 on the title screen with their seeds — tap one to refly that exact map.
 
+**Commendations.** Eight Guild badges, earned once and kept forever — from
+completionist runs (dock everywhere; visit every station *evenly*) through
+skill feats (ten flawless deliveries, a career with zero tows) to endgame
+pilgrimages (touch γ 1,000,000; a single 1,000-universe-year delivery; retire
+ranked Master before turning 30). Unearned badges show dimmed on the title
+screen as goals; the full criteria list lives in ⚙ settings.
+
 **Daily run.** The 📅 DAILY RUN button seeds today's shared cluster — everyone
 flying it gets the same map, shops, and opening offers. Compare share cards.
 

@@ -371,6 +371,18 @@
   .set-toggle.off { opacity: .45; color: var(--hud-dim); }
   .set-controls { font-size: 11.5px; line-height: 1.9; color: var(--hud-dim); padding: 4px 2px; }
   .set-controls b { color: var(--hud); }
+  .set-ic { font-size: 17px; width: 22px; text-align: center; flex: none; }
+  .badge-state { flex: none; font-size: 10px; letter-spacing: 1px; color: var(--ok); }
+  .set-row.badge-locked { opacity: .55; }
+  .set-row.badge-locked .badge-state { color: var(--hud-dim); }
+
+  /* title-screen commendations gallery */
+  #title-badges { margin: 12px auto 2px; text-align: center; }
+  .tb-hd { font-size: 10px; letter-spacing: 2px; color: var(--hud-dim); margin-bottom: 5px; }
+  .tb-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .tb-badge { font-size: 20px; opacity: .25; filter: grayscale(.8); cursor: help; }
+  .tb-badge.on { opacity: 1; filter: none; text-shadow: 0 0 10px rgba(255,215,106,.5); }
+  .badge-desc { color: var(--hud-dim); font-size: 12px; }
 
   /* career journal: the retirement log + the title screen's replayable history */
   .journal { margin-top: 12px; font-size: 12px; }
@@ -590,6 +602,7 @@
         <div><b>You and your passengers age on ship time</b> — fly high-γ to stay young. Retire rich, not old.</div>
       </div>
       <div id="title-records" class="title-records" style="display:none"></div>
+      <div id="title-badges" style="display:none"></div>
       <div id="title-careers" style="display:none"></div>
       <div class="go" id="title-go">▶ click or press any key to report for duty</div>
       <button id="btn-install" class="seed-chip" style="display:none; margin-top:14px">📲 INSTALL APP</button>
@@ -681,6 +694,8 @@
       </div>
       <div class="set-hd">RELATIVISTIC EFFECTS <span class="set-sub">· real physics, rendered per-star — visual only, the economy stays exact · keys 1–5 in flight</span></div>
       <div id="set-fx"></div>
+      <div class="set-hd">COMMENDATIONS <span class="set-sub">· earned once, kept forever — the Guild remembers</span></div>
+      <div id="set-badges"></div>
       <div class="set-hd">CONTROLS</div>
       <div class="set-controls">
         <b>Touch:</b> drag space to steer · tap a station marker to auto-aim · hold the thrust-bar zones (▲ fine, ▲▲ turbo, ▲▲▲ warp) · TOW button when stranded<br/>

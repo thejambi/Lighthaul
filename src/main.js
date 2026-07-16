@@ -166,6 +166,10 @@ const game = {
   upgrades: { tank: 0, drive: 0, damper: 0, broker: 0, rejuv: 0, overdrive: 0, autopilot: 0 },
   lastResult: null,
   journal: [],                // this career's runs, shown as the log at retirement
+  visits: {},                 // station index → docks this career (feeds the map commendations)
+  flawless: 0,                // deliveries landed at 100% integrity this career
+  tows: 0,                    // recovery tows called this career
+  newBadges: [],              // commendations earned this career (shown at retirement)
 };
 
 // --- persistent records (localStorage): the one thing that outlives a career,
@@ -223,6 +227,48 @@ function commitCareer() {                 // fold this career into the saved bes
 // past careers (persisted): what you flew, how it ended, and the seed to refly it
 const CAREERS_KEY = "lighthaul.careers.v1";
 const careers = (() => { try { return JSON.parse(localStorage.getItem(CAREERS_KEY)) || []; } catch (_) { return []; } })();
+
+// ---------------------------------------------------------------------------
+// Guild commendations — persistent achievement badges. Earned once, kept
+// forever; the unearned ones show dimmed as visible goals. Debug careers are
+// play-tests and never earn them.
+// ---------------------------------------------------------------------------
+const BADGES = {
+  allCore:    { icon: "🗺️", name: "Every Ledger Signed", desc: "Dock at all nine core stations in one career" },
+  balanced:   { icon: "⚖️", name: "No Favorites", desc: "Visit every core station at least twice, none favored (spread ≤ 2)" },
+  allDeep:    { icon: "🧭", name: "Edge of the Chart", desc: "Dock at every deep-space station in one career" },
+  whiteGlove: { icon: "🧤", name: "White Glove Service", desc: "Ten flawless deliveries (100% integrity) in one career" },
+  neverTowed: { icon: "🔧", name: "Never Towed", desc: "Retire with ten or more deliveries and not one tow" },
+  gamma1M:    { icon: "⚡", name: "The Millionth γ", desc: "Touch γ 1,000,000 — the governor's absolute limit" },
+  millennium: { icon: "⏳", name: "Millennium Run", desc: "Complete a single delivery that took 1,000+ universe years" },
+  prodigy:    { icon: "🌟", name: "Prodigy", desc: "Retire ranked Master Courier or better before turning 30" },
+};
+const BADGES_KEY = "lighthaul.badges.v1";
+const badges = (() => { try { return JSON.parse(localStorage.getItem(BADGES_KEY)) || {}; } catch (_) { return {}; } })();
+function awardBadge(id) {
+  if (badges[id] || game.debug || game.tutorialActive) return;
+  badges[id] = new Date().toISOString().slice(0, 10);
+  try { localStorage.setItem(BADGES_KEY, JSON.stringify(badges)); } catch (_) {}
+  game.newBadges.push(id);
+  showEggToast(`🏅 COMMENDATION — ${BADGES[id].name}`);
+}
+// checks that can complete mid-career, run at every dock
+function checkDockBadges(usedCoord) {
+  const core = stations.map((s, i) => (s.deep ? -1 : i)).filter((i) => i >= 0);
+  const deep = stations.map((s, i) => (s.deep ? i : -1)).filter((i) => i >= 0);
+  if (core.every((i) => game.visits[i] > 0)) awardBadge("allCore");
+  if (deep.length && deep.every((i) => game.visits[i] > 0)) awardBadge("allDeep");
+  if (game.flawless >= 10) awardBadge("whiteGlove");
+  if (usedCoord >= 1000) awardBadge("millennium");
+  if (game.maxGamma >= 9.9e5) awardBadge("gamma1M");
+}
+// checks that only make sense once the career is over, run at retirement
+function checkRetireBadges() {
+  const counts = stations.map((s, i) => (s.deep ? -1 : (game.visits[i] || 0))).filter((n) => n >= 0);
+  if (counts.every((n) => n >= 2) && Math.max(...counts) - Math.min(...counts) <= 2) awardBadge("balanced");
+  if (game.deliveries >= 10 && game.tows === 0) awardBadge("neverTowed");
+  if (game.credits >= 6000 && game.pilotAge < 30) awardBadge("prodigy");
+}
 
 const ship = {
   pos: new THREE.Vector3(),
@@ -1400,6 +1446,11 @@ function buildSettings() {
     b.textContent = fx[k] ? "ON" : "OFF";
     b.classList.toggle("off", !fx[k]);
   }));
+  // commendations gallery — the goal board, criteria included
+  el("set-badges").innerHTML = Object.entries(BADGES).map(([id, b]) =>
+    `<div class="set-row ${badges[id] ? "" : "badge-locked"}"><span class="set-ic">${b.icon}</span>` +
+    `<span class="set-main"><b>${b.name}</b><span class="set-desc">${b.desc}</span></span>` +
+    `<span class="badge-state">${badges[id] ? "✓ " + badges[id] : "—"}</span></div>`).join("");
 }
 el("st-settings").addEventListener("click", openSettings);
 el("settings-back").addEventListener("click", closeSettings);
@@ -1633,6 +1684,10 @@ function dock() {
   stations[c.to].lastVisit = ship.coordTime;
   game.station = c.to;
   game.journal.push({ ok, what: c.what, to: stations[c.to].name, pay, coordY: usedCoord });
+  // commendation trackers + any badges this dock completes
+  game.visits[c.to] = (game.visits[c.to] || 0) + 1;
+  if (ok && game.integrity >= 0.995) game.flawless++;
+  checkDockBadges(usedCoord);
   game.lastResult = { kind: "dock", ok, pay, usedCoord, usedShip, notes, c, vignette };
   game.contract = null;
   audio.warpSweep(ok);
@@ -1655,6 +1710,8 @@ function callTow() {
   game.fuel = Math.max(game.fuel, tankCap() * 0.5);
   game.station = nearest;
   game.failures++;
+  game.tows++;
+  game.visits[nearest] = (game.visits[nearest] || 0) + 1;
   game.journal.push({ ok: false, what: "towed off a dead stick", to: stations[nearest].name, pay: -cost, coordY: 0 });
   game.lastResult = { kind: "tow", cost, c, nearest };
   game.contract = null;
@@ -1694,7 +1751,9 @@ function buildGameOver() {
   // real transition, but guard anyway so a re-render can't double-count).
   const noRecord = { balance: false, earned: false, deliveries: false, gamma: false };
   const prevBest = records.bestBalance;      // to detect hull unlocks crossed this career
-  const beat = (game.debug || game._recorded) ? noRecord : commitCareer();
+  const firstPass = !game.debug && !game._recorded;
+  const beat = firstPass ? commitCareer() : noRecord;
+  if (firstPass) checkRetireBadges();        // career-complete commendations
   game._recorded = true;
   // a debug run's scorecard isn't bragging material — no share button for it
   el("go-share").style.display = game.debug ? "none" : "";
@@ -1707,8 +1766,11 @@ function buildGameOver() {
   }
   updateTitleRecords();
   updateTitleCareers();
+  updateTitleBadges();
   const star = (on) => on ? ` <span class="rec-new">★ record</span>` : "";
   el("go-title").textContent = forced ? "Mandatory retirement" : "Retired";
+  const badgeHtml = game.newBadges.map((id) =>
+    `<div class="ship-unlock">🏅 COMMENDATION — ${BADGES[id].name}: <span class="badge-desc">${BADGES[id].desc.toLowerCase()}</span></div>`).join("");
   // the epilogue the clocks wrote
   const aged = game.pilotAge - START_AGE;
   const epilogue = ship.coordTime < 200
@@ -1729,7 +1791,7 @@ function buildGameOver() {
     `peak <b>γ ${fmtGamma(game.maxGamma)}</b>${star(beat.gamma)}<br/>` +
     `Career earnings <b class="gold-t">₡${game.earned}</b>${star(beat.earned)} · ` +
     `final balance <b class="gold-t">₡${game.credits}</b>${star(beat.balance)}` +
-    unlockHtml +
+    unlockHtml + badgeHtml +
     (game.debug ? `<div class="alltime">◈ debug career — not recorded</div>` :
     `<div class="alltime">— all-time —&nbsp; richest retirement <b class="gold-t">₡${records.bestBalance}</b>` +
     ` · most deliveries <b>${records.mostDeliveries}</b> · top <b>γ ${fmtGamma(records.topGamma)}</b>` +
@@ -1785,6 +1847,19 @@ el("title-careers").addEventListener("click", (e) => {
   showEggToast("↻ seed " + row.dataset.seed + " loaded — pick a ship");
 });
 
+// title-screen commendations: earned badges shine, the rest sit dimmed as goals
+function updateTitleBadges() {
+  const t = el("title-badges");
+  if (!t) return;
+  const ids = Object.keys(BADGES);
+  const n = ids.filter((id) => badges[id]).length;
+  if (!n) { t.style.display = "none"; return; }   // hidden until the first one lands
+  t.style.display = "block";
+  t.innerHTML = `<div class="tb-hd">COMMENDATIONS · ${n}/${ids.length}</div><div class="tb-row">` +
+    ids.map((id) => `<span class="tb-badge ${badges[id] ? "on" : ""}" title="${BADGES[id].name} — ${BADGES[id].desc}${badges[id] ? " (earned " + badges[id] + ")" : ""}">${BADGES[id].icon}</span>`).join("") +
+    `</div>`;
+}
+
 // title-screen records line (hidden until you've retired at least once)
 function updateTitleRecords() {
   const t = el("title-records");
@@ -1799,6 +1874,7 @@ function updateTitleRecords() {
 }
 updateTitleRecords();
 updateTitleCareers();
+updateTitleBadges();
 
 // ---------------------------------------------------------------------------
 // Input
@@ -1893,6 +1969,8 @@ function applyClass(key) {
   placeStations(seedEl ? seedEl.value.trim() : "");   // typed seed, or a fresh random one
   game.dailyRun = worldSeed === dailySeed();          // flying today's shared cluster?
   stations[game.station].lastVisit = 0;               // home dock: the career starts here
+  game.visits = { [game.station]: 1 };                // commendation trackers start clean
+  game.flawless = 0; game.tows = 0; game.newBadges = [];
   setPhase("station");
 }
 buildClassSelect();

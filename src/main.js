@@ -964,8 +964,11 @@ function buildStation() {
   if (missing < 0.05) {
     rf.textContent = "TANK FULL";
   } else {
-    const disc = Math.round(fuelDiscount(missing) * 100);
-    rf.textContent = disc >= 3 ? `REFUEL ₡${fuelCost(missing)} · −${disc}%` : `REFUEL (₡${fuelCost(missing)})`;
+    // net vs the base rate, so a fuel event (rationing/glut) shows honestly here
+    const disc = Math.round((1 - fuelUnitPrice(missing) / FUEL_PRICE) * 100);
+    rf.textContent = disc >= 3 ? `REFUEL ₡${fuelCost(missing)} · −${disc}%`
+                   : disc <= -3 ? `REFUEL ₡${fuelCost(missing)} · +${-disc}%`
+                   : `REFUEL (₡${fuelCost(missing)})`;
   }
   rf.disabled = missing < 0.05;
 

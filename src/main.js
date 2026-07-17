@@ -59,8 +59,9 @@ const WARP_X = 9;           // X multiplier — "warp thrust", unlocked by Redli
 const SPOOL = 2.5;          // drive response: how fast β chases the throttle setting. (Multiplied by Redline Coils level + 1 for warp burn.)
 const AP_DECEL = 0.14;      // autopilot throttle-down rate floor = the S-key rate
 const AP_BRAKE_G = 0.9995;    // autopilot brakes up to this fraction of the cargo's g-rating
-const PREFLIGHT = 10;       // seconds after undock: clock frozen, aim at the target (or thrust to launch early)
+const PREFLIGHT = 20;       // seconds after undock: clock frozen, aim at the target (or thrust to launch early)
 const AIM_RATE = 2.2;       // autopilot slerp rate onto the target heading (per second)
+const AIM_SNAP_PX = 16;     // crosshair within this of the target locks the aim (= the reticle ring's radius in CSS)
 const DRAG_SENS = 0.004;    // radians of turn per pixel dragged (before ship handling)
 const KEY_TURN = 1.3;       // yaw rad/s for a held A/D key (before ship handling)
 const ROLL_TURN = 1.6;      // roll rad/s for a held Q/E key
@@ -2498,6 +2499,20 @@ function update(dt) {
   }
   const launching = game.preflight > 0;
   if (launching) ship.throttle = 0;                             // stay put until GO
+
+  // --- crosshair capture: steer the crosshair anywhere inside the target's
+  // gold reticle ring and the aim locks on exactly, same as tapping the marker.
+  // Only while hands are off the stick, so it grabs on release instead of
+  // fighting an in-progress drag. (Skipped when layout is collapsed — the
+  // hidden-tab viewport is 0×0 and every pixel distance reads as a hit.)
+  if (game.contract && !aimStation && !autopilotAssist && !manualSteer && window.innerWidth > 0) {
+    _proj.copy(stations[game.contract.to].pos).project(camera);
+    if (_proj.z <= 1) {
+      const cx = _proj.x * 0.5 * window.innerWidth;
+      const cy = _proj.y * 0.5 * window.innerHeight;
+      if (Math.hypot(cx, cy) < AIM_SNAP_PX) { aimStation = stations[game.contract.to]; }
+    }
+  }
 
   // --- assisted aim: the autopilot holds the contract target; a tapped marker
   // locks onto it the same way. Both hold the target dead-centre until you steer

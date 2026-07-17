@@ -189,9 +189,10 @@
   .landmark .d { color: var(--hud-dim); font-size: 10px; margin-left: 6px; }
   .landmark.target .tag { color: var(--gold); }
   .landmark.target .dot { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
-  /* the target aim dot gets a thin reticle ring so it reads as "point here" */
+  /* the target aim dot gets a reticle ring: point the crosshair anywhere inside
+     it and the aim locks on (AIM_SNAP_PX in main.js matches this radius) */
   .landmark.target .dot::after { content: ""; position: absolute; left: 50%; top: 50%;
-    width: 16px; height: 16px; transform: translate(-50%,-50%); border-radius: 50%;
+    width: 32px; height: 32px; transform: translate(-50%,-50%); border-radius: 50%;
     border: 1px solid rgba(255,215,106,.55); }
 
   #toast { position: absolute; top: calc(50% - 60px); left: 50%; transform: translateX(-50%); z-index: 4;

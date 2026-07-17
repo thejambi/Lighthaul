@@ -174,6 +174,7 @@ const game = {
   tows: 0,                    // recovery tows called this career
   careerBadges: [],           // every commendation earned THIS career — a repeatable run goal
   newBadges: [],              // the subset earned for the first time ever (they get the ★)
+  runPeakG: 0,                // peak felt load this run (feeds Spine of Steel)
 };
 
 // --- persistent records (localStorage): the one thing that outlives a career,
@@ -247,6 +248,7 @@ const BADGES = {
   millennium: { icon: "⏳", name: "Millennium Run", desc: "Complete a single delivery that took 1,000+ universe years" },
   prodigy:    { icon: "🌟", name: "Prodigy", desc: "Retire ranked Master Courier or better before turning 30" },
   ironCourier:{ icon: "☠️", name: "Iron Courier", desc: "Retire a hardcore career (no tows) ranked Journeyman or better" },
+  spine:      { icon: "🦾", name: "Spine of Steel", desc: "Pull 14g of felt load on a delivery and still hand it over at 100% integrity" },
 };
 const BADGES_KEY = "lighthaul.badges.v1";
 const badges = (() => { try { return JSON.parse(localStorage.getItem(BADGES_KEY)) || {}; } catch (_) { return {}; } })();
@@ -265,7 +267,7 @@ function awardBadge(id) {
   showEggToastLong(first ? `🏅 ★ NEW COMMENDATION — ${BADGES[id].name}` : `🏅 COMMENDATION — ${BADGES[id].name}`);
 }
 // checks that can complete mid-career, run at every dock
-function checkDockBadges(usedCoord) {
+function checkDockBadges(usedCoord, ok) {
   const core = stations.map((s, i) => (s.deep ? -1 : i)).filter((i) => i >= 0);
   const deep = stations.map((s, i) => (s.deep ? i : -1)).filter((i) => i >= 0);
   if (core.every((i) => game.visits[i] > 0)) awardBadge("allCore");
@@ -273,6 +275,9 @@ function checkDockBadges(usedCoord) {
   if (game.flawless >= 10) awardBadge("whiteGlove");
   if (usedCoord >= 1000) awardBadge("millennium");
   if (game.maxGamma >= 9.9e5) awardBadge("gamma1M");
+  // 14g needs a 14–18g-rated contract to survive at 100% — the cheap rugged
+  // freight nobody wants is exactly where this one lives
+  if (ok && game.integrity >= 0.995 && game.runPeakG >= 14) awardBadge("spine");
 }
 // checks that only make sense once the career is over, run at retirement
 function checkRetireBadges() {
@@ -1678,6 +1683,7 @@ el("btn-tutorial-skip").addEventListener("click", () => {
 function depart(c) {
   game.contract = { ...c, acceptCoord: ship.coordTime, acceptShip: ship.shipTime };
   game.integrity = 1;
+  game.runPeakG = 0;
   stations[game.station].lastVisit = ship.coordTime;   // this dock saw you leave just now
   ship.pos.copy(stations[game.station].pos);
   ship.throttle = 0;
@@ -1746,7 +1752,7 @@ function dock() {
   // commendation trackers + any badges this dock completes
   game.visits[c.to] = (game.visits[c.to] || 0) + 1;
   if (ok && game.integrity >= 0.995) game.flawless++;
-  checkDockBadges(usedCoord);
+  checkDockBadges(usedCoord, ok);
   game.lastResult = { kind: "dock", ok, pay, usedCoord, usedShip, notes, c, vignette };
   game.contract = null;
   audio.warpSweep(ok);
@@ -2605,6 +2611,7 @@ function update(dt) {
   const loadTarget = (Math.abs(coordAccel) * LOAD_K +
                      THREE.MathUtils.clamp(omegaTurn * ship.beta * 5, 0, 10)) * loadFactor();
   dyn.load += (loadTarget - dyn.load) * Math.min(1, dt * 5);
+  if (!game.testFlight && dyn.load > game.runPeakG) game.runPeakG = dyn.load;
 
   // exceed the contract's inertial rating and you damage the load (no cargo to
   // stress in a free test flight)

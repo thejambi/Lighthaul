@@ -94,9 +94,11 @@ log** (every run, pay, and the universe years it cost) and a **📋 SHARE RUN**
 button that copies an emoji summary for the group chat. Recent careers persist
 on the title screen with their seeds — tap one to refly that exact map.
 
-**Commendations.** Nine Guild badges — from completionist runs (dock
+**Commendations.** Ten Guild badges — from completionist runs (dock
 everywhere; visit every station *evenly*) through skill feats (ten flawless
-deliveries, a career with zero tows) to endgame pilgrimages (touch γ 1,000,000;
+deliveries, a career with zero tows, a 14 g delivery handed over at 100%
+integrity — take the rugged high-g freight and *fly it like you mean it*) to
+endgame pilgrimages (touch γ 1,000,000;
 a single 1,000-universe-year delivery; retire ranked Master before turning 30;
 survive a hardcore career). Badges re-earn every career — the share card counts
 your haul, so "how many in one run" is its own game — while first-evers get the

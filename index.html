@@ -376,6 +376,11 @@
   .set-row.badge-locked { opacity: .55; }
   .set-row.badge-locked .badge-state { color: var(--hud-dim); }
 
+  /* ☠ hardcore toggle + dock economy-event banner */
+  #btn-hardcore.hc-on { color: var(--warn); border-color: rgba(255,106,90,.55); background: rgba(48,12,10,.35); }
+  .dock-event { margin: 10px 0 2px; padding: 9px 13px; border: 1px solid rgba(255,215,106,.5);
+    border-radius: 8px; background: rgba(40,32,8,.3); color: var(--gold); font-size: 12.5px; line-height: 1.6; }
+
   /* retirement: commendations earned this career (★ = first time ever) */
   .career-badges { margin-top: 12px; }
   .cb-hd { font-size: 11px; letter-spacing: 1.5px; color: var(--gold); margin-bottom: 4px; }
@@ -634,6 +639,7 @@
         <label for="seed-input">map seed</label>
         <input id="seed-input" type="text" maxlength="16" placeholder="random" autocomplete="off" spellcheck="false"/>
         <button class="btn" id="btn-daily" title="Everyone flying today's run shares this cluster">📅 DAILY RUN</button>
+        <button class="btn" id="btn-hardcore" title="No recovery tows — a dead stick ends the career">☠ HARDCORE: OFF</button>
         <span class="seed-note">optional — reuse a seed to replay the same cluster · <a id="link-tutorial">🎓 flight school</a></span>
       </div>
       <div class="support">
@@ -648,6 +654,7 @@
       <h2 id="st-name">Station</h2>
       <div class="dock-meta"><span id="st-debug" class="debug-chip" style="display:none">◈ DEBUG</span></div>
       <div class="stat-line" id="st-stats"></div>
+      <div id="st-event" class="dock-event" style="display:none"></div>
       <div id="st-lowfuel" class="lowfuel" style="display:none"></div>
       <div class="map-hint">CONTRACTS &amp; TRIP PLANNER · tap a destination — gold routes are your offers, ✓/✗ shows if you can make the run</div>
       <svg id="map-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>

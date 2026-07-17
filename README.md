@@ -94,12 +94,24 @@ log** (every run, pay, and the universe years it cost) and a **📋 SHARE RUN**
 button that copies an emoji summary for the group chat. Recent careers persist
 on the title screen with their seeds — tap one to refly that exact map.
 
-**Commendations.** Eight Guild badges, earned once and kept forever — from
-completionist runs (dock everywhere; visit every station *evenly*) through
-skill feats (ten flawless deliveries, a career with zero tows) to endgame
-pilgrimages (touch γ 1,000,000; a single 1,000-universe-year delivery; retire
-ranked Master before turning 30). Unearned badges show dimmed on the title
-screen as goals; the full criteria list lives in ⚙ settings.
+**Commendations.** Nine Guild badges — from completionist runs (dock
+everywhere; visit every station *evenly*) through skill feats (ten flawless
+deliveries, a career with zero tows) to endgame pilgrimages (touch γ 1,000,000;
+a single 1,000-universe-year delivery; retire ranked Master before turning 30;
+survive a hardcore career). Badges re-earn every career — the share card counts
+your haul, so "how many in one run" is its own game — while first-evers get the
+★ and persist. Unearned badges show dimmed on the title screen as goals; the
+full criteria list lives in ⚙ settings.
+
+**☠ Hardcore.** A toggle at career start: no recovery tows. Run the tank dry
+with no way to brake and your only option is ABANDON SHIP — the career ends
+where it drifts, listed in the ledger as "en route." Fuel stops being a cost
+and becomes survival.
+
+**Dock economy events.** About a third of arrivals, the local economy is doing
+something: fuel rationing (×2) or a tank-farm surplus (60%), an export boom
+(+30% pay) or a dock strike (−20%), an outfitter clearance (−25% upgrades).
+Chase the booms; refuel at the gluts.
 
 **Daily run.** The 📅 DAILY RUN button seeds today's shared cluster — everyone
 flying it gets the same map, shops, and opening offers. Compare share cards.

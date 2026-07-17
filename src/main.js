@@ -160,6 +160,9 @@ const game = {
   testFlight: false,          // free-flight sandbox — no contract, clock, fuel, or damage
   tutorialActive: false,      // flight school: real physics, zero career consequence
   dailyRun: false,            // flying today's shared DAILY RUN cluster
+  hardcore: false,            // ☠ no recovery tows — a dead stick ends the career
+  abandoned: false,           // the career ended by abandoning ship (hardcore's failure state)
+  dockEvent: null,            // this dock's economy event (fuel/pay/shop modifier), rolled per arrival
   debug: false,               // play-test mode: free upgrades + teleport (armed at ship-select)
   maxGamma: 1,                // highest Lorentz factor reached this career (a persisted record)
   deepLicense: false,         // earned by delivering after touching γ ≥ DEEP_GAMMA — opens long-haul space
@@ -218,7 +221,7 @@ function commitCareer() {                 // fold this career into the saved bes
   careers.unshift({
     d: new Date().toISOString().slice(0, 10), seed: worldSeed, ship: shipCls().name,
     rank: rankFor(game.credits), bal: game.credits, del: game.deliveries,
-    coordY: Math.round(ship.coordTime),
+    coordY: Math.round(ship.coordTime), hc: game.hardcore ? 1 : 0,
   });
   careers.length = Math.min(careers.length, 20);
   try { localStorage.setItem(CAREERS_KEY, JSON.stringify(careers)); } catch (_) {}
@@ -243,6 +246,7 @@ const BADGES = {
   gamma1M:    { icon: "⚡", name: "The Millionth γ", desc: "Touch γ 1,000,000 — the governor's absolute limit" },
   millennium: { icon: "⏳", name: "Millennium Run", desc: "Complete a single delivery that took 1,000+ universe years" },
   prodigy:    { icon: "🌟", name: "Prodigy", desc: "Retire ranked Master Courier or better before turning 30" },
+  ironCourier:{ icon: "☠️", name: "Iron Courier", desc: "Retire a hardcore career (no tows) ranked Journeyman or better" },
 };
 const BADGES_KEY = "lighthaul.badges.v1";
 const badges = (() => { try { return JSON.parse(localStorage.getItem(BADGES_KEY)) || {}; } catch (_) { return {}; } })();
@@ -276,6 +280,7 @@ function checkRetireBadges() {
   if (counts.every((n) => n >= 2) && Math.max(...counts) - Math.min(...counts) <= 2) awardBadge("balanced");
   if (game.deliveries >= 10 && game.tows === 0) awardBadge("neverTowed");
   if (game.credits >= 6000 && game.pilotAge < 30) awardBadge("prodigy");
+  if (game.hardcore && game.credits >= 3000) awardBadge("ironCourier");
 }
 
 const ship = {
@@ -393,8 +398,33 @@ function contractPay(c) { return Math.round(c.pay * payMult() * repMult()); }
 // rapidity, so brake fuel is capacity-independent — a big tank you let run low
 // before topping off buys the cheapest fuel.
 function fuelDiscount(qty) { return Math.min(FUEL_MAX_DISC, Math.max(0, qty) * FUEL_BULK_DISC); }
-function fuelUnitPrice(qty) { return FUEL_PRICE * (1 - fuelDiscount(qty)); }
+function fuelUnitPrice(qty) {
+  return FUEL_PRICE * (1 - fuelDiscount(qty)) * (game.dockEvent && game.dockEvent.fuel || 1);
+}
 function fuelCost(qty) { return Math.ceil(qty * fuelUnitPrice(qty)); }
+// this dock's price for an upgrade tier — the OUTFITTER CLEARANCE event discounts it
+function upgradeCost(k, lv) {
+  const base = UPGRADES[k].costs[lv];
+  return base === undefined ? undefined : Math.round(base * (game.dockEvent && game.dockEvent.shop || 1));
+}
+
+// ---------------------------------------------------------------------------
+// Dock economy events — about a third of arrivals, the local economy is doing
+// something: fuel shortages and gluts, export booms, strikes, outfit sales.
+// Rolled from the seeded rng alongside the contracts, applied at the three
+// price choke points (fuel, contract pay at generation, shop). Route choice
+// gets a live economic layer: chase the booms, refuel at the gluts.
+// ---------------------------------------------------------------------------
+const DOCK_EVENTS = [
+  { txt: "⛽ FUEL RATIONING — a shortage at this dock. Δv costs ×2; fill up elsewhere if you can.", fuel: 2 },
+  { txt: "⛽ TANK-FARM SURPLUS — Δv at 60% of the usual rate. Top off before you go.", fuel: 0.6 },
+  { txt: "📈 EXPORT BOOM — brokers here are paying +30% on contracts cut at this dock.", pay: 1.3 },
+  { txt: "📉 DOCK STRIKE — the brokers' guild is out. Contracts cut here pay −20%.", pay: 0.8 },
+  { txt: "🔧 OUTFITTER CLEARANCE — upgrades stocked at this dock are −25% today.", shop: 0.75 },
+];
+function rollDockEvent() {
+  return rng() < 0.35 ? DOCK_EVENTS[(rng() * DOCK_EVENTS.length) | 0] : null;
+}
 
 // ---------------------------------------------------------------------------
 // Star layers (engine copy)
@@ -852,6 +882,11 @@ function makeContracts(fromIdx) {
       offers.push(makeOffer(fromIdx, t));
     }
   }
+  // a boom/strike at THIS dock bakes into the offers cut here, so the adjusted
+  // pay travels with the contract (and every display stays consistent)
+  if (game.dockEvent && game.dockEvent.pay) {
+    offers.forEach((o) => { o.pay = Math.round(o.pay * game.dockEvent.pay); });
+  }
   return offers;
 }
 
@@ -872,7 +907,11 @@ function setPhase(p) {
   if (p !== "flight") audio.silence();     // don't let the engine drone hang on non-flight screens
   // generate the three contracts once, on arrival — not on every re-render
   // (so refuelling doesn't re-roll the offers)
-  if (p === "station") { game.offers = makeContracts(game.station); mapSelected = -1; buildStation(); }
+  if (p === "station") {
+    game.dockEvent = rollDockEvent();               // the local economy, rolled per arrival
+    game.offers = makeContracts(game.station);      // (pay events bake into these offers)
+    mapSelected = -1; buildStation();
+  }
   if (p === "results") buildResults();
   if (p === "over") buildGameOver();
   markDirty();
@@ -897,6 +936,11 @@ function buildStation() {
   seedBtn.innerHTML = seedChipHtml("tap to copy");
   seedBtn.classList.remove("copied");
   el("st-debug").style.display = game.debug ? "" : "none";
+
+  // the local economy, if anything's happening this arrival
+  const ev = el("st-event");
+  ev.style.display = game.dockEvent ? "block" : "none";
+  if (game.dockEvent) ev.textContent = game.dockEvent.txt;
 
   el("st-ship").innerHTML =
     `<div class="ship-mini">${SHIP_ART[game.cls]}</div>` +
@@ -947,7 +991,7 @@ function buildShop() {
     const max = u.costs.length;
     // autopilot counts as owned if the easter egg already switched it on
     const owned = k === "autopilot" ? (lv > 0 || autopilotAssist) : lv >= max;
-    const cost = u.costs[lv];
+    const cost = upgradeCost(k, lv);     // event-adjusted (OUTFITTER CLEARANCE)
     let pips = "";
     if (!u.oneShot) for (let i = 0; i < max; i++) pips += `<span class="pip ${i < lv ? "on" : ""}"></span>`;
     let ctrl;
@@ -966,7 +1010,7 @@ function buildShop() {
 
 function buyUpgrade(k) {
   const lv = game.upgrades[k];
-  const cost = UPGRADES[k].costs[lv];
+  const cost = upgradeCost(k, lv);       // event-adjusted, matches the shop display
   if (cost === undefined) return;
   if (!game.debug) {                    // debug play-test mode: outfits are free
     if (game.credits < cost) return;
@@ -1705,6 +1749,13 @@ function dock() {
 function callTow() {
   if (game.phase !== "flight" || game.testFlight) return;   // nothing to tow in a free flight
   if (game.tutorialActive) { finishTutorial("towed"); return; }   // the tow IS the lesson
+  if (game.hardcore) {
+    // no rescue out here — abandoning ship ends the career where it drifts
+    game.abandoned = true;
+    game.journal.push({ ok: false, what: "abandoned ship in deep space", to: "—", pay: 0, coordY: 0 });
+    setPhase("over");
+    return;
+  }
   const c = game.contract;
   let nearest = 0, best = Infinity;
   stations.forEach((s, i) => {
@@ -1776,7 +1827,8 @@ function buildGameOver() {
   updateTitleCareers();
   updateTitleBadges();
   const star = (on) => on ? ` <span class="rec-new">★ record</span>` : "";
-  el("go-title").textContent = forced ? "Mandatory retirement" : "Retired";
+  el("go-title").textContent = game.abandoned ? "Lost with all hands"
+    : forced ? "Mandatory retirement" : "Retired";
   const badgeHtml = game.careerBadges.length
     ? `<div class="career-badges"><div class="cb-hd">🏅 COMMENDATIONS THIS CAREER · ${game.careerBadges.length}/${Object.keys(BADGES).length}</div>` +
       game.careerBadges.map((id) =>
@@ -1786,11 +1838,13 @@ function buildGameOver() {
     : "";
   // the epilogue the clocks wrote
   const aged = game.pilotAge - START_AGE;
-  const epilogue = ship.coordTime < 200
-    ? `A short career by universe reckoning — but every year of it was yours.`
-    : ship.coordTime < 2000
-      ? `You watched ${fmtY(ship.coordTime)} of history pass a cockpit window — and spent ${fmtY(ship.shipTime)} of your own to see it.`
-      : `Empires rose, archived themselves, and became footnotes while you flew. ${fmtY(ship.coordTime)} passed out there; you aged ${aged.toFixed(1)} years. The Guild calls that a career.`;
+  const epilogue = game.abandoned
+    ? `The ledger closes mid-sentence. Somewhere out there your ship is still coasting, ${fmtBeta(ship.beta)}c and silent. The Guild lists you as "en route."`
+    : ship.coordTime < 200
+      ? `A short career by universe reckoning — but every year of it was yours.`
+      : ship.coordTime < 2000
+        ? `You watched ${fmtY(ship.coordTime)} of history pass a cockpit window — and spent ${fmtY(ship.shipTime)} of your own to see it.`
+        : `Empires rose, archived themselves, and became footnotes while you flew. ${fmtY(ship.coordTime)} passed out there; you aged ${aged.toFixed(1)} years. The Guild calls that a career.`;
   const nxt = nextRank(game.credits);
   el("go-body").innerHTML =
     `<div class="rank">rank earned · <b class="gold-t">${rankFor(game.credits)}</b>` +
@@ -1829,6 +1883,7 @@ function buildShareText() {
     ? `Lighthaul Daily — ${new Date().toISOString().slice(0, 10)}`
     : `Lighthaul Run`;
   return head + "\n" +
+    (game.hardcore ? `☠️ HARDCORE${game.abandoned ? " — lost with all hands" : ""}\n` : "") +
     `${rankEmoji(game.credits)} ${rankFor(game.credits)}\n` +
     `📦 ${game.deliveries} deliveries · ₡${game.credits.toLocaleString()}\n` +
     `⏳ ${fmtY(ship.coordTime)} passed · 🧑‍🚀 aged ${(game.pilotAge - START_AGE).toFixed(1)} yr\n` +
@@ -1849,7 +1904,7 @@ function updateTitleCareers() {
   if (!careers.length) { t.style.display = "none"; return; }
   t.style.display = "block";
   t.innerHTML = `<div class="tc-hd">RECENT CAREERS · tap to refly a map</div>` + careers.slice(0, 5).map((c) =>
-    `<div class="tc-row" data-seed="${c.seed}">${rankEmoji(c.bal)} <b>${c.rank}</b> · ₡${c.bal.toLocaleString()}` +
+    `<div class="tc-row" data-seed="${c.seed}">${c.hc ? "☠ " : ""}${rankEmoji(c.bal)} <b>${c.rank}</b> · ₡${c.bal.toLocaleString()}` +
     ` · ${c.del} runs · ${c.ship} <span class="tc-seed">↻ ${c.seed}</span></div>`).join("");
 }
 el("title-careers").addEventListener("click", (e) => {
@@ -1971,6 +2026,17 @@ function buildClassSelect() {
 }
 let debugArmed = false, eggTaps = 0, eggTapTimer = null;
 
+// ☠ hardcore: armed on the select screen, locked in at career start. No tows —
+// a dead stick with no way to brake ends the career where it drifts.
+let hardcoreArmed = false;
+el("btn-hardcore").addEventListener("click", () => {
+  hardcoreArmed = !hardcoreArmed;
+  const b = el("btn-hardcore");
+  b.textContent = hardcoreArmed ? "☠ HARDCORE: ON" : "☠ HARDCORE: OFF";
+  b.classList.toggle("hc-on", hardcoreArmed);
+  showEggToast(hardcoreArmed ? "☠ HARDCORE — no tows. Fly like it matters." : "hardcore off — tows available");
+});
+
 function applyClass(key) {
   if (!shipUnlocked(key)) return;
   game.cls = key;
@@ -1979,6 +2045,7 @@ function applyClass(key) {
   game.fuel = c.tank;           // start with a full tank of the class's size
   game.debug = debugArmed;      // the badge easter egg arms it; a career keeps it, next resets
   debugArmed = false;
+  game.hardcore = hardcoreArmed;   // locked in for the whole career
   const seedEl = el("seed-input");
   placeStations(seedEl ? seedEl.value.trim() : "");   // typed seed, or a fresh random one
   game.dailyRun = worldSeed === dailySeed();          // flying today's shared cluster?
@@ -2197,7 +2264,7 @@ el("btn-mute").addEventListener("click", () => { audio.toggleMute(); updateSound
 let towArmed = false, towTimer = null;
 function disarmTow() {
   towArmed = false; clearTimeout(towTimer);
-  const b = el("btn-tow"); b.textContent = "TOW"; b.classList.remove("armed");
+  const b = el("btn-tow"); b.textContent = game.hardcore ? "ABANDON" : "TOW"; b.classList.remove("armed");
 }
 el("btn-tow").addEventListener("click", () => {
   if (game.phase !== "flight") return;
@@ -2232,7 +2299,7 @@ function setFlightHelp() {
     t.innerHTML = `<div class="title">FLIGHT CONTROLS</div>` +
       `<b>Mouse</b> steer (drag) · <b>tap</b> a marker to auto-aim<br/>` +
       `<b>W/S</b> throttle ± · <b>Shift</b> turbo${warp}<br/>` +
-      `<b>R</b> call tow · <b>M</b> mute`;
+      `<b>R</b> ${game.hardcore ? "abandon ship" : "call tow"} · <b>M</b> mute`;
   }
 }
 function updateSoundIndicator() {
@@ -2676,7 +2743,9 @@ function updateHUD(gamma, dist, coordRate) {
     cls = "dockable";
   } else if (game.fuel <= 0) {
     // dead stick trumps everything — you can't thrust, so the tow is the only move
-    status = "⚠ OUT OF FUEL — call a tow to recover";
+    status = game.hardcore
+      ? "⚠ OUT OF FUEL — no tows out here. ABANDON (R) ends the career"
+      : "⚠ OUT OF FUEL — call a tow to recover";
     cls = "brake";
   } else if (dyn.load > c.gLimit) {
     status = "⚠ OVER INERTIAL RATING — ease off";

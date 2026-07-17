@@ -20,7 +20,10 @@
 export const C_CAP = 0.9999995; // we never let real physics reach exactly c
 
 export function lorentz(beta) {
-  return 1 / Math.sqrt(1 - beta * beta);
+  // (1-β)(1+β) instead of 1-β² — algebraically identical, but avoids the
+  // catastrophic cancellation of 1-β² when β is within a few ulps of 1
+  // (1-β is EXACT for doubles in [0.5, 1], so extreme γ stays accurate)
+  return 1 / Math.sqrt((1 - beta) * (1 + beta));
 }
 
 // Aberrate a lab-frame unit direction `dir` (toward a star) given motion

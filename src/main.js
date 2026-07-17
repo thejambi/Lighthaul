@@ -311,9 +311,16 @@ const HUD_FADE_HI = 0.85;     // ...above this they've faded away (only after th
 // Effective speed cap. C_CAP is the stock governor; each Redline Coils level
 // shrinks the remaining gap to c by 10× (adds a nine), so top-throttle γ climbs
 // and you age even less — for more Δv.
-// clamp keeps 1−β ≥ 5e-13 (γ ≈ 1e6): below that, doubles round β to exactly 1
-// and γ/rapidity blow up to Infinity. Level 6 sits right at that floor.
-function capBeta() { return Math.min(1 - 5e-13, 1 - (1 - C_CAP) * Math.pow(10, -game.upgrades.overdrive)); }
+// The governor's top end is ulp-tuned: doubles near 1 are so coarse that one
+// step of β moves γ by ~111, and the raw max-coils formula lands on a double
+// whose γ reads 999,956. Anything in that top neighbourhood returns the
+// specific double whose γ ≈ 1,000,067 instead, so the advertised γ 1,000,000
+// is genuinely reachable (the record pegs there). This also keeps the old
+// safety clamp — 1−β can never fall low enough to round β to exactly 1.
+function capBeta() {
+  const b = 1 - (1 - C_CAP) * Math.pow(10, -game.upgrades.overdrive);
+  return b > 1 - 5.1e-13 ? 1 - 4.9995e-13 : b;
+}
 
 // The pilot-frame pacing softcap also lifts with each Redline Coils level, so
 // redline legs actually cover ground faster in real time (≈ PROPER_RATE·gammaCap
@@ -2539,8 +2546,16 @@ function update(dt) {
   const spool = SPOOL * (warpBurn ? 1 + (game.upgrades.overdrive * 1.5) : 1);
   const targetBeta = throttleToBeta(ship.throttle);
   ship.beta += (targetBeta - ship.beta) * Math.min(1, dt * spool);
+  // float-ulp snap: near the governor the asymptotic ease stalls a couple ulps
+  // short of capBeta (the increment rounds to a no-op), pinning γ at ~999,8xx.
+  // A 1e-14 gap is physically meaningless — snap so full throttle truly reaches
+  // the cap and the γ record can peg its advertised 1,000,000.
+  if (ship.beta < targetBeta && targetBeta - ship.beta < 1e-14) ship.beta = targetBeta;
   const gamma = lorentz(ship.beta);
-  if (!game.testFlight && gamma > game.maxGamma) game.maxGamma = gamma;   // career peak γ (a record)
+  // career peak γ (a record). Pegged at the governor's advertised 1,000,000:
+  // the capped double actually computes γ ≈ 1,000,067 (see capBeta), and the
+  // record should read the number on the dial.
+  if (!game.testFlight && gamma > game.maxGamma) game.maxGamma = Math.min(gamma, 1e6);
   const phi = rapidity(ship.beta);
   const dphi = Math.abs(phi - dyn.prevPhi);
   dyn.prevPhi = phi;

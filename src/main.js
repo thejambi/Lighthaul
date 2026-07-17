@@ -2141,10 +2141,10 @@ function showEggToast(text, messageLifeMultiplier = 1) {
   t.textContent = text;
   t.classList.add("show");
   clearTimeout(eggToastTimer);
-  eggToastTimer = setTimeout(() => t.classList.remove("show"), 1600 * messageLifeMultiplier);
+  eggToastTimer = setTimeout(() => t.classList.remove("show"), 2200 * messageLifeMultiplier);
 }
 function showEggToastLong(text) {
-  showEggToast(text, 3);
+  showEggToast(text, 2);
 }
 
 // keyboard: Konami code  ↑ ↑ ↓ ↓ ← → ← → B A

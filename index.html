@@ -432,16 +432,17 @@
   .cc-tag.armed { color: #fff; border-color: var(--gold); background: rgba(255,215,106,.22);
     box-shadow: 0 0 10px rgba(255,215,106,.5); }
 
-  /* map seed input (tucked under the ship cards) */
-  .seed-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 12px;
+  /* map seed input (tucked under the ship cards): two rows — run-mode buttons,
+     then the seed field with the flight-school link */
+  .seed-row { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; padding-top: 14px;
     border-top: 1px solid rgba(143,233,255,.12); font-size: 11px; color: var(--hud-dim); }
+  .seed-actions, .seed-map { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
   .seed-row label { letter-spacing: 1px; text-transform: uppercase; }
   #seed-input { font: inherit; font-size: 12px; color: var(--hud); background: rgba(0,0,0,.3);
     border: 1px solid rgba(143,233,255,.3); border-radius: 5px; padding: 4px 8px; width: 120px;
     letter-spacing: .5px; }
   #seed-input:focus { outline: none; border-color: rgba(143,233,255,.6); }
   #seed-input::placeholder { color: var(--hud-dim); opacity: .7; }
-  .seed-note { opacity: .8; }
 
   /* dock debug chip (top) + seed chip (footer, click to copy) */
   .dock-meta:not(:empty) { display: flex; align-items: center; gap: 8px; margin: -2px 0 8px; }
@@ -637,11 +638,15 @@
         You can patch a weakness with upgrades later, but the ship you pick shapes how you'll haul.</div>
       <div id="class-list"></div>
       <div class="seed-row">
-        <label for="seed-input">map seed</label>
-        <input id="seed-input" type="text" maxlength="16" placeholder="random" autocomplete="off" spellcheck="false"/>
-        <button class="btn" id="btn-daily" title="Everyone flying today's run shares this cluster">📅 DAILY RUN</button>
-        <button class="btn" id="btn-hardcore" title="No recovery tows — a dead stick ends the career">☠ HARDCORE: OFF</button>
-        <span class="seed-note">optional — reuse a seed to replay the same cluster · <a id="link-tutorial">🎓 flight school</a></span>
+        <div class="seed-actions">
+          <button class="btn" id="btn-daily" title="Everyone flying today's run shares this cluster">📅 DAILY RUN</button>
+          <button class="btn" id="btn-hardcore" title="No recovery tows — a dead stick ends the career">☠ HARDCORE: OFF</button>
+        </div>
+        <div class="seed-map">
+          <label for="seed-input">map seed</label>
+          <input id="seed-input" type="text" maxlength="16" placeholder="random" autocomplete="off" spellcheck="false"/>
+          <a id="link-tutorial">🎓 flight school</a>
+        </div>
       </div>
       <div class="support">
         <a class="btn gold bmc-btn" href="https://buymeacoffee.com/zburnham" target="_blank" rel="noopener">☕ BUY ME A TEA</a>

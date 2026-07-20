@@ -99,8 +99,9 @@ everywhere; visit every station *evenly*) through skill feats (ten flawless
 deliveries, a career with zero tows, a 14 g delivery handed over at 100%
 integrity — take the rugged high-g freight and *fly it like you mean it*) to
 endgame pilgrimages (touch γ 1,000,000;
-a single 1,000-universe-year delivery; retire ranked Master before turning 30;
-survive a hardcore career). Badges re-earn every career — the share card counts
+a single 1,000-universe-year delivery; make Master Courier having aged under 30
+years — rich and still young, the twin paradox as a flex; survive a hardcore
+career). Badges re-earn every career — the share card counts
 your haul, so "how many in one run" is its own game — while first-evers get the
 ★ and persist. Unearned badges show dimmed on the title screen as goals; the
 full criteria list lives in ⚙ settings.

@@ -247,7 +247,7 @@ const BADGES = {
   neverTowed: { icon: "🔧", name: "Never Towed", desc: "Retire with ten or more deliveries and not one tow" },
   gamma1M:    { icon: "⚡", name: "The Millionth γ", desc: "Touch γ 1,000,000 — the governor's absolute limit" },
   millennium: { icon: "⏳", name: "Millennium Run", desc: "Complete a single delivery that took 1,000+ universe years" },
-  prodigy:    { icon: "🌟", name: "Prodigy", desc: "Retire ranked Master Courier or better before turning 30" },
+  prodigy:    { icon: "🌟", name: "Prodigy", desc: "Retire ranked Master Courier or better having aged under 30 years — rich, and still young" },
   ironCourier:{ icon: "☠️", name: "Iron Courier", desc: "Retire a hardcore career (no tows) ranked Journeyman or better" },
   spine:      { icon: "🦾", name: "Spine of Steel", desc: "Pull 14g of felt load on a delivery and still hand it over at 100% integrity" },
 };
@@ -285,7 +285,7 @@ function checkRetireBadges() {
   const counts = stations.map((s, i) => (s.deep ? -1 : (game.visits[i] || 0))).filter((n) => n >= 0);
   if (counts.every((n) => n >= 2) && Math.max(...counts) - Math.min(...counts) <= 2) awardBadge("balanced");
   if (game.deliveries >= 10 && game.tows === 0) awardBadge("neverTowed");
-  if (game.credits >= 6000 && game.pilotAge < 30) awardBadge("prodigy");
+  if (game.credits >= 6000 && game.pilotAge - START_AGE < 30) awardBadge("prodigy");
   if (game.hardcore && game.credits >= 3000) awardBadge("ironCourier");
 }
 
